@@ -1,64 +1,213 @@
-# ERC-1056 compliant DID Registry
+# ERC - 1056 compliant DID Registry
 
-## Overview
+This package is a custom ERC-1056 based DID registry implementation with enhanced permission controls for company identity management. This work extends did:ethr, it is compliant with ERC-1056, and could be switched out for official did:ethr with some comprimise, or additional layers could be added for workarounds if we come up with them. (especially for the permission controls, more in the next chapters)
 
-This package implements a draft smart contract that manages decentralized identities on EVM compatible blockchains. Also initialized as a Hardhat project. Each Ethereum address gets an associated DID in the format `did:ethr:<address>`.
+## Architecture Overview
 
-## Smart Contract
+This package focuses on Company identities. It implements three core contracts:
 
-### DIDRegistry.sol
+### 1. **DIDRegistry.sol** - Core Identity Registry
+The foundational contract is **ERC-1056 compliant** and extends the did:ethr implementation pattern with a key enhancement: **serviceAdmin delegates**.
 
-The core contract provides:
+**Features:**
+- ERC-1056 compliant with all required events and functions
+- Identity ownership and delegation
+- Attribute management with custom permission model
+- `serviceAdmin` delegate type: Can update `serviceEndpoint` attributes only (enhancement over official did:ethr)
+- Standard delegates (veriKey): Can sign/authenticate on behalf of identity, but cannot modify attributes
 
-- **Identity Ownership**: Transfer control of an identity to another address
-- **Delegation**: Grant delegation for specific purposes, for a set amount of time
-- **Attributes**: Store and manage identity metadata like public keys, service endpoints, etc. These can be detailed based on our needs
-- **Event-based Resolution**: All changes emit events for off-chain DID document construction. This approach could also be changed
+**Delegation Model:**
+This (two) tiered delegation system enables detailed access control rights while maintaining ERC-1056 compliance. Note that this requires modifications to the standard did:ethr implementation. Possible configurations include:
 
-### Key Functions
+1) **Company + Admin + Service model** (current implementation): Standard delegates (admins) for identity management, serviceAdmin delegates for service endpoint updates
+2) **Simplified service-only model**: Only serviceAdmin delegates exist; no standard delegates needed
+3) **Extended permission tiers**: Additional delegate types for different control levels (for example, `attributeAdmin`, `keyRotationAdmin`)
 
-- `changeOwner()` - Transfer identity ownership
-- `addDelegate()` / `revokeDelegate()` - Manage delegated permissions
-- `setAttribute()` / `revokeAttribute()` - Store identity metadata
-- `validDelegate()` - Check if delegation is active
-- `getAttribute()` - Retrieve identity attributes
+**Why Custom Implementation?**
+The official `did:ethr` registry (EthrDIDRegistry) restricts `setAttribute()` to identity owners only. This implementation allows specified permissions,service admins can update service endpoints without full identity control.
 
-## Use Case: CRSet Integration
+From our gap analysis:
+> "only DID controller (=owner) can edit service section of did:ethr"
 
-For the CRSet project, this registry has the potential to do the following:
+**Possible solution:** `serviceAdmin` delegates can update service attributes while owners retain full control over identity and other attributes. In this model, trustAnchors are the owners of company DIDs. Companies transfer ownership to the TA during registration to join the trusted ecosystem.
 
-1. Store issuer DID documents on-chain
-2. Link IPFS CIDs of revocation Bloom filters to issuer identities via `setAttribute()` ; this is conceptual, currently no IPFS logic is present in this specific directory
-3. Allow verifiers to resolve issuer DIDs and retrieve current revocation data
-4. Support key rotation and delegate management for issuers
+### 2. **CompanyRegistry.sol** - Metadata and Queryability Layer
+Provides optimized read access to company information and admin lists.
+
+**Why Separate Contract?**
+- `DIDRegistry` stores delegates in a mapping so no way to retrieve a list of admins on-chain
+- Parsing events for every query is inefficient
+- `CompanyRegistry` maintains arrays for queryability: `getAdmins(companyDID)` returns all admins instantly
+
+**Key Functions:**
+- `createCompany()` - Registers company metadata, validates trust anchor ownership
+- `addAdmin()` - Bookkeeping only (actual delegate is added in DIDRegistry)
+- `getAdmins()` - Returns array of admin addresses for a company DID
+
+### 3. **MockTrustAnchor.sol** - Governance Wrapper
+Handles the operations across DIDRegistry and CompanyRegistry with ownership verification.
+
+**Current Status:** Simplified implementation suitable for sinlge owner control. 
+
+**When It Becomes Useful:**
+- Multisig governance 
+- approval workflows
+- Centralized oversight requirements
+
+**Key Functions:**
+- `registerCompany()` - Creates company in both registries atomically
+- `addCompanyAdmin()` - Adds delegate in DIDRegistry + bookkeeping in CompanyRegistry
+- `grantServiceAdmin()` - Adds `serviceAdmin` delegate for service endpoint management
+
+- basically a wrapper of the other two contracts; logic + bookkeeping
+
+## Permission Model
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Trust Anchor (Governance Layer)                             │
+│  - Registers companies                                       │
+│  - Grants initial admin access                              │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Company DID (Identity)                                      │
+│  Owner: Trust Anchor                                         │
+│  Attributes: { name, did, domain, ... }                     │
+└─────────────────────────────────────────────────────────────┘
+        │                                │
+        │ admin delegate                 │ serviceAdmin delegate
+        ▼                                ▼
+┌──────────────────┐          ┌──────────────────────────────┐
+│  Company Admin   │          │  Service Admin               │
+│  - Read identity │          │  - Read identity             │
+│  - Cannot edit   │          │  - Update serviceEndpoint    │
+│    attributes    │          │  - Cannot edit other attrs   │
+└──────────────────┘          └──────────────────────────────┘
+
+- admin / serviceAdmin distinction is optional
+```
+
+## Real World Flow
+
+**Scenario:** Trust anchor registers a company and grants service management access.
+
+```solidity
+// 1. Trust Anchor registers company
+mockTrustAnchor.registerCompany(
+    companyDID,          // company wallet address
+    "CoreBlockchain Corp",
+    "cbc.com"
+);
+// the company is now created in both registries, and trustAnchor is owner
+
+// NOTE: steps 2 and 3 can be merged, when there is no distinction needed between normal admin and serviceAdin (serviceAdmin becomes the default/only admin type in that case)
+
+// 2. Grant admin access (read only delegate)
+mockTrustAnchor.addCompanyAdmin(
+    companyDID,
+    adminAddress,        // company admins wallet
+    365 days             // could be set to max int for infinity 
+);
+// Admin can now view but not modify identity
+
+// 3. Grant service management access
+mockTrustAnchor.grantServiceAdmin(
+    companyDID,
+    serviceAdminAddress, // service operator wallet / company admins wallet
+    365 days
+);
+// admin became serviceAdmin and can update service endpoints
+
+// 4. Service admin updates endpoint
+didRegistry.setAttribute(
+    companyDID,
+    "serviceEndpoint",
+    "https://api.something/vc",
+    365 days
+);
+// Service endpoint update allowed because caller is serviceAdmin
+
+// 5. Service admin tries to update name (FAILS)
+didRegistry.setAttribute(
+    companyDID,
+    "companyName",
+    "Evil Corp",
+    365 days
+);
+// this transaction reverts because serviceAdmin can only update serviceEndpoint
+```
 
 ## Getting Started
 
-### Installation
-
-```bash
+```powershell
+# Install dependencies
 npm install
+
+# Compile contracts
+npx hardhat compile
+
+# Run tests (tests covering different scenarios)
+npx hardhat test
+
+# Deploy to local network (deployment not tested yet!)
+npx hardhat node                           # Terminal 1
+npx hardhat run scripts/deploy.ts --network localhost  # Terminal 2
 ```
 
-### Compile Contracts
+## Key Differences: Custom vs Official did:ethr
 
-```bash
-npm run compile
+| Feature | Custom DIDRegistry | Official EthrDIDRegistry |
+|---------|-------------------|-------------------------|
+| **setAttribute Permissions** | Owner OR serviceAdmin (for service attrs) | Owner only |
+| **Delegate Types** | Generic + serviceAdmin | Generic only |
+| **Attribute Storage** | On-chain mapping | Events only |
+| **Meta-Transactions** | no | yes |
+| **Primary Use Case** | Business logic with granular permissions | Generic DID resolver |
+
+## Why Official did:ethr was not used here?
+
+The official `EthrDIDRegistry` contract has `setAttribute()` restricted to identity owners:
+
+```solidity
+function setAttribute(
+    address identity,
+    bytes32 name,
+    bytes memory value,
+    uint validity
+) public onlyOwner(identity, msg.sender) {  // Only owner can call!
+    // ...
+}
 ```
 
-### Deploy
+**Our Requirement:** Service administrators need to update service endpoints without full identity control.
 
-No deployment script currently. The purpose of this work in its current stage is to demonstrate a ERC-1056 / did:ethr compliant contract, and setting up the development environment.
+**Proposed Solution:** Custom permission model in `setAttribute()`:
+```solidity
+bool isServiceAdmin = validDelegate(identity, delegateType, msg.sender);
+bool isServiceEndpointAttribute = (name == "serviceEndpoint");
 
-### Next Steps
+require(
+    isOwner || (isServiceAdmin && isServiceEndpointAttribute),
+    "Not authorized"
+);
+```
 
-- Finalize DID method choice, did:ethr looks like the strongest candidate, compare it to alternatives
+This enables limited write access for service management while preserving identity owner (TA) sovereignty. However, this diverges from did:ethr permission model. If proceeding with did:ethr, alternative patterns would be required such as ownership transfer workflows. Or alternatively, admins have no attribute modification rights at all, making them generic delegates and did:ethr can therefore be used (if no other constraints occur).
 
-- Create deployment scripts for testnet and production
+## Test Coverage
 
-- Preparing test suite
++20 tests for:
+-  Company registration and metadata
+-  Admin delegation and expiration
+-  Service admin permissions (can/cannot scenarios)
+-  Attribute management authorization
+-  Integration flows across all three contracts
+-  Edge cases (zero addresses, invalid delegates, expired delegates)
 
-- Building DID resolver utilities
+Run `npx hardhat test` to verify all scenarios.
 
-- Integrate with CRSet issuer service
+More tests will be added when functionality is modified / more requirements are specified.
+
 

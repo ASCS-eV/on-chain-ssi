@@ -50,14 +50,14 @@ contract DIDRegistry {
         return owner != address(0) ? owner : identity;
     }
     
-    // Changes the owner of an identity
+    // Changes the owner of an identity. Used to transfer the ownership to the trust anchor. If the ownership is not transferred after creation to the trustAnchor, the company can not be registered by the CompanyRegistry/TrustAnchor
     function changeOwner(address identity, address newOwner) external onlyOwner(identity) {
         owners[identity] = newOwner;
         changed[identity] = block.number;
         emit DIDOwnerChanged(identity, newOwner, changed[identity]);
     }
     
-    // Adds - revokes a delegate with specific permissions for a certain time
+    // Adds - revokes a delegate with specific permissions for a certain time. For our case, there wont be necessarily time limits, so we can set it to max uint256
     function addDelegate(
         address identity,
         bytes32 delegateType,
@@ -81,17 +81,32 @@ contract DIDRegistry {
     }
     
     //Sets an attribute for an identity, and the next function revokes it
+    // UPDATED: to support serviceAdmin delegates for serviceEndpoint updates. The admin can only set the serviceEndpoint attribute, whereas the owner (trustAnchor) can set any attribute.
     function setAttribute(
         address identity,
         bytes32 name, // name refers to the attribute key, bytes32 to save gas
         bytes calldata value, // The attribute value (encoded bytes; could be IPFS CID of revocation data, public key, URL, etc.)
         uint256 validity
-    ) external onlyOwner(identity) {
+    ) external {
+        // Check if caller is owner
+        bool isOwner = identityOwner(identity) == msg.sender;
+        
+        // Check if caller is a serviceAdmin delegate (for serviceEndpoint only)
+        bool isServiceAdmin = validDelegate(identity, keccak256("serviceAdmin"), msg.sender);
+        bool isServiceEndpointAttribute = name == keccak256("serviceEndpoint");
+        
+        // Authorization: owner/trust Anchor can update anything, serviceAdmin can only update serviceEndpoint!
+        require(
+            isOwner || (isServiceAdmin && isServiceEndpointAttribute),
+            "Not authorized to set this attribute"
+        );
+        
         attributes[identity][name] = value;
         uint256 validTo = block.timestamp + validity;
         attributeExpiry[identity][name] = validTo;
+        uint256 previousChange = changed[identity];
         changed[identity] = block.number;
-        emit DIDAttributeChanged(identity, name, value, validTo, changed[identity]);
+        emit DIDAttributeChanged(identity, name, value, validTo, previousChange);
     }
     
     function revokeAttribute(address identity, bytes32 name) external onlyOwner(identity) {
