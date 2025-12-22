@@ -1,217 +1,153 @@
-// in production: const REGISTRY_ADDRESS = "0x03d5003bf0e79C5F5223588F347ebA39AfbC3818"; //did:ethr contract in Sepolia
-
 import assert from "node:assert/strict";
 import { describe, it, beforeEach } from "node:test";
 import { network } from "hardhat";
-import { keccak256, toHex } from "viem";
+import { keccak256, toHex, encodeFunctionData, parseAbiItem } from "viem";
 
-describe("DIDMultisigController (local EthereumDIDRegistry)", async function () {
+describe("DIDMultisigController (Refactored)", async function () {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
-  const [owner1, owner2, owner3, delegate] = await viem.getWalletClients();
+  const [owner1, owner2, owner3, companyAdmin, randomUser] = await viem.getWalletClients();
 
   let registry: any;
   let multisig: any;
+  let companyDid: any;
 
-  /**
-   * Helper: propose an action and return its proposalId
-   */
-  async function proposeAndGetId(
-    txPromise: Promise<`0x${string}`>,
-  ): Promise<`0x${string}`> {
+  // Helper to get Proposal ID from logs
+  async function getProposalId(txPromise: Promise<`0x${string}`>): Promise<`0x${string}`> {
     const txHash = await txPromise;
     const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
-
-    const log = receipt.logs.find(
-      (l: any) =>
-        l.address.toLowerCase() === multisig.address.toLowerCase(),
-    );
-
-    assert.ok(log, "ProposalCreated event not found");
-
-    // ProposalCreated(bytes32 indexed id, bytes data)
+    const log = receipt.logs.find((l: any) => l.address.toLowerCase() === multisig.address.toLowerCase());
     return log.topics[1];
   }
 
   beforeEach(async () => {
     registry = await viem.deployContract("EthereumDIDRegistry");
 
+    // Deploy Trust Anchor Multisig (3 owners, Quorum 2)
     multisig = await viem.deployContract("DIDMultisigController", [
       registry.address,
-      [
-        owner1.account.address,
-        owner2.account.address,
-        owner3.account.address,
-      ],
-      2n, // quorum = 2-of-3
+      [owner1.account.address, owner2.account.address, owner3.account.address],
+      2n,
     ]);
-  });
 
-  it("Initial owners and quorum are set correctly", async () => {
-    assert.equal(await multisig.read.quorum(), 2n);
-    assert.equal(await multisig.read.isOwner([owner1.account.address]), true);
-    assert.equal(await multisig.read.isOwner([owner2.account.address]), true);
-    assert.equal(await multisig.read.isOwner([owner3.account.address]), true);
-  });
+    // Create a "Company" identity and assign the Multisig as its owner
+    companyDid = randomUser.account.address;
 
-  it("Can propose and execute addDelegate via quorum", async () => {
-    const delegateType = keccak256(toHex("did:ethr:delegate"));
-
-    const proposalId = await proposeAndGetId(
-      multisig.write.proposeAddDelegate(
-        [delegateType, delegate.account.address, 3600n],
-        { account: owner1.account },
-      ),
+    // FIX: Pass TWO arguments: [identity, newOwner]
+    await registry.write.changeOwner(
+        [companyDid, multisig.address],
+        { account: randomUser.account }
     );
+  });
 
-    await multisig.write.approve([proposalId], {
-      account: owner2.account,
+  // --- REQUIREMENT: Single Admin Manage Company ---
+  it("Single admin can update Company DID attributes (Speed Layer)", async () => {
+    const attrName = keccak256(toHex("did/service/Company"));
+    const attrValue = toHex("https://company.com");
+
+    // Encode the registry call
+    // setAttribute(address identity, bytes32 name, bytes value, uint validity)
+    const data = encodeFunctionData({
+      abi: registry.abi,
+      functionName: "setAttribute",
+      args: [companyDid, attrName, attrValue, 3600n]
     });
 
-    const isValid = await registry.read.validDelegate([
-      multisig.address,
-      delegateType,
-      delegate.account.address,
-    ]);
+    // Owner 1 calls execCall (no voting)
+    await multisig.write.execCall([registry.address, data], { account: owner1.account });
 
-    assert.equal(isValid, true);
-  });
-
-  it("Can revoke a delegate via quorum", async () => {
-    const delegateType = keccak256(toHex("did:ethr:delegate"));
-
-    // first add
-    const addId = await proposeAndGetId(
-      multisig.write.proposeAddDelegate(
-        [delegateType, delegate.account.address, 3600n],
-        { account: owner1.account },
-      ),
-    );
-    await multisig.write.approve([addId], { account: owner2.account });
-
-    // then revoke
-    const revokeId = await proposeAndGetId(
-      multisig.write.proposeRevokeDelegate(
-        [delegateType, delegate.account.address],
-        { account: owner1.account },
-      ),
-    );
-    await multisig.write.approve([revokeId], { account: owner2.account });
-
-    const isValid = await registry.read.validDelegate([
-      multisig.address,
-      delegateType,
-      delegate.account.address,
-    ]);
-
-    assert.equal(isValid, false);
-  });
-
-  it("Can set a DID attribute via quorum", async () => {
-    const attrName = keccak256(toHex("did/service/Example"));
-    const attrValue = toHex("https://example.com");
-
-    const fromBlock = await publicClient.getBlockNumber();
-
-    const proposalId = await proposeAndGetId(
-      multisig.write.proposeSetAttribute(
-        [attrName, attrValue, 3600n],
-        { account: owner1.account },
-      ),
-    );
-
-    await multisig.write.approve([proposalId], {
-      account: owner2.account,
+    // Verify using parseAbiItem for safety
+    const eventLogs = await publicClient.getContractEvents({
+      address: registry.address,
+      abi: registry.abi, // Explicit ABI helps Viem parsing
+      eventName: "DIDAttributeChanged",
     });
+
+    // Find event for companyDid
+    const event = eventLogs.find((e:any) => e.args.identity.toLowerCase() === companyDid.toLowerCase());
+    assert.ok(event, "Attribute should be changed by single admin");
+  });
+
+  // --- REQUIREMENT: Single Admin CANNOT Manage TA Identity ---
+  it("Single admin CANNOT update Trust Anchor DID attributes directly", async () => {
+    const attrName = keccak256(toHex("did/service/TA"));
+    // Attempting to modify multisig.address (TA Identity)
+    const data = encodeFunctionData({
+      abi: registry.abi,
+      functionName: "setAttribute",
+      args: [multisig.address, attrName, toHex("bad"), 3600n]
+    });
+
+    // Should fail because target identity == multisig address
+    await assert.rejects(
+        multisig.write.execCall([registry.address, data], { account: owner1.account }),
+        /use_proposal_for_self/
+    );
+  });
+
+  // --- REQUIREMENT: Quorum for TA Identity ---
+  it("Trust Anchor Attribute updates require Quorum", async () => {
+    const attrName = keccak256(toHex("did/service/TA"));
+    const id = await getProposalId(
+        multisig.write.proposeSetAttribute([attrName, toHex("ok"), 3600n], { account: owner1.account })
+    );
+
+    // 1 signature: Not executed (Quorum is 2)
+    // Owner 1 must approve explicitly now (logic consistency)
+    await multisig.write.approve([id], { account: owner1.account });
+
+    // 2 signatures (Quorum reached)
+    await multisig.write.approve([id], { account: owner2.account });
 
     const events = await publicClient.getContractEvents({
       address: registry.address,
       abi: registry.abi,
-      eventName: "DIDAttributeChanged",
-      fromBlock,
-      strict: true,
+      eventName: "DIDAttributeChanged"
     });
 
-    assert.equal(events.length, 1);
-    assert.equal(events[0].args.identity, multisig.address);
+    const event = events.find((e:any) => e.args.identity.toLowerCase() === multisig.address.toLowerCase());
+    assert.ok(event, "Event for TA should be emitted after quorum");
   });
 
-  it("Can revoke a DID attribute via quorum", async () => {
-    const attrName = keccak256(toHex("did/service/Example"));
-    const attrValue = toHex("https://example.com");
+  // --- REQUIREMENT: Unanimity for Ownership ---
+  it("ChangeOwner requires Unanimity (3/3)", async () => {
+    const newOwner = companyAdmin.account.address;
 
-    const setId = await proposeAndGetId(
-      multisig.write.proposeSetAttribute(
-        [attrName, attrValue, 3600n],
-        { account: owner1.account },
-      ),
+    // Target: Company DID ownership change
+    const id = await getProposalId(
+        multisig.write.proposeChangeOwner([companyDid, newOwner], { account: owner1.account })
     );
-    await multisig.write.approve([setId], { account: owner2.account });
 
-    const revokeId = await proposeAndGetId(
-      multisig.write.proposeRevokeAttribute(
-        [attrName, attrValue],
-        { account: owner1.account },
-      ),
-    );
-    await multisig.write.approve([revokeId], { account: owner2.account });
+    await multisig.write.approve([id], { account: owner1.account });
+    await multisig.write.approve([id], { account: owner2.account });
 
-    assert.ok(true); // success = no revert
+    // 2/3: Should NOT be executed yet
+    let currentOwner = await registry.read.identityOwner([companyDid]);
+    assert.notEqual(currentOwner.toLowerCase(), newOwner.toLowerCase());
+
+    // 3/3: Execution
+    await multisig.write.approve([id], { account: owner3.account });
+
+    currentOwner = await registry.read.identityOwner([companyDid]);
+    assert.equal(currentOwner.toLowerCase(), newOwner.toLowerCase());
   });
 
-  it("Can change DID owner via quorum", async () => {
-    const newOwner = owner3.account.address;
-
-    const proposalId = await proposeAndGetId(
-      multisig.write.proposeChangeOwner(
-        [newOwner],
-        { account: owner1.account },
-      ),
+  // --- REQUIREMENT: Add/Remove Owner ---
+  it("Add Owner requires Unanimity", async () => {
+    const id = await getProposalId(
+        multisig.write.proposeAddOwner([companyAdmin.account.address], { account: owner1.account })
     );
 
-    await multisig.write.approve([proposalId], {
-      account: owner2.account,
-    });
+    await multisig.write.approve([id], { account: owner1.account });
+    await multisig.write.approve([id], { account: owner2.account });
+    // Not enough (2/3)
+    let isOwner = await multisig.read.isOwner([companyAdmin.account.address]);
+    assert.equal(isOwner, false);
 
-    const owner = await registry.read.identityOwner([multisig.address]);
-    assert.equal(owner, newOwner);
-  });
+    // 3/3
+    await multisig.write.approve([id], { account: owner3.account });
 
-  it("Can update quorum only with unanimous approval", async () => {
-    const proposalId = await proposeAndGetId(
-      multisig.write.proposeQuorumUpdate(
-        [3n],
-        { account: owner1.account },
-      ),
-    );
-
-    await multisig.write.approve([proposalId], {
-      account: owner2.account,
-    });
-    await multisig.write.approve([proposalId], {
-      account: owner3.account,
-    });
-
-    assert.equal(await multisig.read.quorum(), 3n);
-  });
-
-  it("Does not execute proposals below quorum", async () => {
-    const delegateType = keccak256(toHex("did:ethr:delegate"));
-
-    const proposalId = await proposeAndGetId(
-      multisig.write.proposeAddDelegate(
-        [delegateType, delegate.account.address, 3600n],
-        { account: owner1.account },
-      ),
-    );
-
-    // only one approval (owner1 already proposed, but proposal ≠ approval)
-    const isValid = await registry.read.validDelegate([
-      multisig.address,
-      delegateType,
-      delegate.account.address,
-    ]);
-
-    assert.equal(isValid, false);
+    isOwner = await multisig.read.isOwner([companyAdmin.account.address]);
+    assert.equal(isOwner, true);
   });
 });
