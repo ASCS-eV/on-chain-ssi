@@ -1,16 +1,19 @@
 # did:ethr identifiers for trust anchors
 
-## Desired behaviour of did:ethr identifier for trust anchor
-1. trust anchor deploys its own DIDMultisigController contract that registers its admins, sets the quorum threshold, and ultimately configures the did:ethr identifier of the trust anchor
-2. the quorum threshold can only be set when all trust anchor admins agree to the new quorum threshold
-3. a new trust anchor admin can only be added when all current trust anchor admins agree to the new trust anchor admin
-4. a trust anchor admin can only be removed when all current trust anchors admins agree to removal (excluding the trust anchor admin whose removal is considered)
+## Desired features for identity of trust anchor
+1. trust anchor creates its did:ethr-based identity by deploying its own DIDMultisigController contract that registers its admins, sets the quorum threshold, and configures the did:ethr identifier of the trust anchor
+2. the quorum threshold of a DIDMultisigController contract can only be updated when all trust anchor admins agree to the new quorum threshold
+3. a new trust anchor admin can only be added when all trust anchor admins agree to the new trust anchor admin
+4. a trust anchor admin can only be removed when all trust anchors admins agree to removal (excluding the trust anchor admin whose removal is considered)
+5. a quorum of trust anchor admins can call the addDelegate, revokeDelegate, setAttribute, and revokeAttribute function of the trust anchor's did:ethr identifier
+6. only all trust anchor admins together can call the changeOwner function of the trust anchor's did:ethr identifier
 
-## Mandatory workflows for trust anchor regarding companies
-The following worklfows must be possible through the DIDMultisigController contract:
-
-1. trust anchor uses its deployed DIDMultisigController contract to create did:ethr identifier for company that has the trust anchor as DID controller, i.e. trust anchor sets itself as DID controller of company did:ethr using setOwner function of company's did:ethr
-2. admin of trust anchor uses the deployed DIDMultisigController contract of its trust anchor to set the admins of the company by running setAttribute on "verificationMethod" section of the company's did:ethr identifier - i.e., trust anchor lists DID of all company admins in verificationMethod section using setAttribute function of did:ethr + optional: allows admins to issue VCs using setDelegate function of did:ethr
+## Desired features for identity of companies
+1. creating did:ethr identifier for company: one trust anchor admin sets the trust anchor as DID controller of company did:ethr using changeOwner function of company's did:ethr
+2. adding company admins to did:ethr identifier of company: one trust anchor admin uses the deployed DIDMultisigController contract of its trust anchor to set the admins of the company by running setAttribute on "verificationMethod" section of the company's did:ethr identifier and by running setDelegate function of the company's did:ethr identifier
+3. removing company admins from did:ethr identifier of company: one trust anchor admin uses the deployed DIDMultisigController contract of its trust anchor to remove an admin of the company by running revokeAttribute on "verificationMethod" section of the company's did:ethr identifier and by running revokeDelegate function of the company's did:ethr identifier
+4. only all trust anchor admins together can call the changeOwner function of their companys' did:ethr identifier
+5. one trust anchor admin uses the deployed DIDMultisigController contract of its trust anchor to add a static pointer to a smart contract that enables company admins to change the CID of BFC of company's CRSet by calling the setAttribute function on the "service" section of the company's did:ethr identifier
 
 ## Usage of Hardhat
 
