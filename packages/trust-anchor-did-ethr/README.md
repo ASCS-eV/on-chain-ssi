@@ -9,7 +9,7 @@
 6. only all trust anchor admins together can call the changeOwner function of the trust anchor's did:ethr identifier
 
 ## Desired features for identity of companies
-1. creating did:ethr identifier for company: one trust anchor admin sets the trust anchor as DID controller of company did:ethr using changeOwner function of company's did:ethr
+1. creating did:ethr identifier for company: one trust anchor admin or one company admin sets the trust anchor as DID controller of company did:ethr using changeOwner function of company's did:ethr
 2. adding company admins to did:ethr identifier of company: one trust anchor admin uses the deployed DIDMultisigController contract of its trust anchor to set the admins of the company by running setAttribute on "verificationMethod" section of the company's did:ethr identifier and by running setDelegate function of the company's did:ethr identifier
 3. removing company admins from did:ethr identifier of company: one trust anchor admin uses the deployed DIDMultisigController contract of its trust anchor to remove an admin of the company by running revokeAttribute on "verificationMethod" section of the company's did:ethr identifier and by running revokeDelegate function of the company's did:ethr identifier
 4. only all trust anchor admins together can call the changeOwner function of their companys' did:ethr identifier
