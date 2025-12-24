@@ -4,13 +4,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { config } from './lib/wagmi'
 import { AppLayout } from './components/layout/AppLayout'
 import { TrustAnchorDashboard } from './pages/trust-anchor/Dashboard'
+import { CompaniesPage } from './pages/trust-anchor/Companies'
 
 const queryClient = new QueryClient()
-
-// Placeholder for Companies page (we will build this next)
-function CompaniesPage() {
-  return <div className="p-4">Companies Page Coming Soon...</div>
-}
 
 function App() {
   return (

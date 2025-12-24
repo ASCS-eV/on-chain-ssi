@@ -1,12 +1,38 @@
-// FIX: Added 'type' keyword here. 
-// This tells Vite "Address" is just for TypeScript, not real JavaScript code.
 import { type Address } from 'viem'
 
 // 1. Address of your contract (Placeholder for now)
-export const TRUST_ANCHOR_ADDRESS: Address = "0x5FbDB2315678afecb367f032d93F642f64180aa3" 
+export const TRUST_ANCHOR_ADDRESS: Address = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" 
 
-// 2. ABI - Instructions for JS on how to talk to the contract
 export const TRUST_ANCHOR_ABI = [
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "id", "type": "bytes32" },
+      { "indexed": false, "internalType": "bytes", "name": "data", "type": "bytes" },
+      { "indexed": false, "internalType": "bool", "name": "requiresUnanimity", "type": "bool" }
+    ],
+    "name": "ProposalCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "id", "type": "bytes32" },
+      { "indexed": true, "internalType": "address", "name": "owner", "type": "address" }
+    ],
+    "name": "Approved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "bytes32", "name": "id", "type": "bytes32" }
+    ],
+    "name": "Executed",
+    "type": "event"
+  },
+
+  // --- FUNCTIONS ---
   {
     "inputs": [],
     "name": "quorum",
@@ -19,6 +45,23 @@ export const TRUST_ANCHOR_ABI = [
     "name": "owners",
     "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "identity", "type": "address" },
+      { "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "proposeChangeOwner",
+    "outputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "id", "type": "bytes32" }],
+    "name": "approve",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ] as const

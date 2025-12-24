@@ -1,71 +1,123 @@
-import { Users, Shield, Globe, Key } from 'lucide-react'
+import { Users, Shield, Globe, ShieldCheck, CheckCircle, Clock } from 'lucide-react'
 import { StatCard } from '../../components/ui/StatCard'
 import { useTrustAnchorData } from '../../hooks/useTrustAnchor'
+import { useGovernance } from '../../hooks/useGovernance'
 import { useAccount } from 'wagmi'
 
 export function TrustAnchorDashboard() {
-  // 1. Connect to our custom hook to fetch data from the blockchain
-  const { quorum, isLoading } = useTrustAnchorData()
-  
-  // 2. Check wallet connection status
+  // Extract data from our custom hook
+  // Added isLoading here to fix the white screen error
+  const { quorum, owners, proposals, totalAdmins, isLoading } = useTrustAnchorData()
   const { isConnected } = useAccount()
+  const { approveProposal, isPending } = useGovernance()
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Trust Anchor Overview</h1>
-        <p className="text-slate-500 mt-2">Manage your identity, admins, and governance policies.</p>
+        <p className="text-slate-500 mt-2">Managing the root of trust on Etherlink.</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Card 1: Quorum (Real Data) */}
         <StatCard 
-          title="Consensus Quorum" 
-          // Show "..." while loading, otherwise show the actual number from the smart contract
-          value={isLoading ? "..." : quorum} 
+          title="Required Quorum" 
+          value={isLoading ? "..." : `${quorum} of ${totalAdmins}`} 
           icon={<Shield className="w-5 h-5" />}
-          description={isConnected ? "Synced from Chain" : "Connect Wallet to View"}
+          description="Consensus Threshold"
         />
-        
-        {/* Card 2: Admins (Placeholder for now) */}
         <StatCard 
           title="Active Admins" 
-          value="3" 
+          value={isLoading ? "..." : totalAdmins} 
           icon={<Users className="w-5 h-5" />}
-          description="Ultimate Governance Layer"
+          description="Total TA Owners"
         />
-
-        {/* Card 3: Companies (Placeholder for now) */}
         <StatCard 
-          title="Managed Companies" 
-          value="12" 
+          title="Companies" 
+          value="1" 
           icon={<Globe className="w-5 h-5" />}
-          description="Speed Layer Active"
+          description="Controlled Entities"
         />
       </div>
 
-      {/* Main Action Area */}
+      {/* ACTIVE PROPOSALS SECTION */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
           <h3 className="font-semibold text-slate-800">Governance Proposals</h3>
-          <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">View All History</button>
         </div>
         
-        <div className="p-12 text-center text-slate-400">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 mb-4">
-            <Key className="w-8 h-8 text-slate-300" />
-          </div>
-          <p className="text-lg">No active proposals pending approval.</p>
-          
-          {/* Button is disabled if wallet is not connected */}
-          <button 
-            disabled={!isConnected} 
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Create New Proposal
-          </button>
+        <div className="divide-y divide-slate-100">
+          {proposals.length > 0 ? (
+            proposals.map((p, idx) => (
+              <div key={idx} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-all">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-mono text-slate-500 uppercase tracking-tight">
+                      Proposal ID: {p.id.slice(0, 14)}...
+                    </p>
+                    <p className="font-medium text-slate-900 mt-1">
+                      {p.requiresUnanimity ? 'Critical Action: Ownership/Admins' : 'Routine Identity Update'}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => approveProposal(p.id)}
+                  disabled={!isConnected || isPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {isPending ? 'Confirming...' : 'Approve'}
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="p-12 text-center text-slate-400">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 opacity-20" />
+              <p className="text-lg">No active proposals. Everything is up to date.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ADMINS LIST TABLE */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800 flex items-center">
+            <ShieldCheck className="w-4 h-4 mr-2 text-indigo-500" />
+            Trust Anchor Admins
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
+              <tr>
+                <th className="px-6 py-3">Admin Address</th>
+                <th className="px-6 py-3 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {owners.map((owner, idx) => (
+                <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-mono text-slate-600">{owner}</td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-50 text-green-700 text-xs font-medium">
+                      Active Owner
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {!isLoading && owners.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="px-6 py-10 text-center text-slate-400">
+                    No admins detected. Ensure your local node is running.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
