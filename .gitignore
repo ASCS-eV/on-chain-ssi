@@ -137,3 +137,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+**/ignition/deployments/chain-31337/
+**/ignition/deployments/**/build-info/
