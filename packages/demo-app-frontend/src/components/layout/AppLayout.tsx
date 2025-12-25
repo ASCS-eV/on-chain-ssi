@@ -1,6 +1,6 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Building2, ShieldCheck, LogOut } from 'lucide-react'
+import { LayoutDashboard, Building2, ShieldCheck, LogOut, SatelliteDishIcon } from 'lucide-react'
 import { useAccount, useDisconnect, useConnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 
@@ -17,6 +17,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navItems = [
     { label: 'Trust Anchor', path: '/', icon: ShieldCheck },
     { label: 'Companies', path: '/companies', icon: Building2 },
+    { label: 'Onboarding', path: '/onboarding', icon: SatelliteDishIcon },
   ]
 
   // Helper to shorten address (e.g. 0x1234...5678)

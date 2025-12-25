@@ -1,9 +1,21 @@
 import { type Address } from 'viem'
 
-// 1. Address of your contract (Placeholder for now)
-export const TRUST_ANCHOR_ADDRESS: Address = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" 
+const ENV_TRUST_ANCHOR_ADDRESS = import.meta.env.VITE_TRUST_ANCHOR_ADDRESS
+const ENV_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS
+
+if (!ENV_TRUST_ANCHOR_ADDRESS || !ENV_TRUST_ANCHOR_ADDRESS.startsWith('0x')) {
+  console.error("CRITICAL: Trust Anchor Address not set in .env")
+}
+if (!ENV_REGISTRY_ADDRESS || !ENV_REGISTRY_ADDRESS.startsWith('0x')) {
+  console.error("CRITICAL: Registry Address not set in .env")
+}
+
+export const TRUST_ANCHOR_ADDRESS: Address = (ENV_TRUST_ANCHOR_ADDRESS as Address) || "0x0000000000000000000000000000000000000000"
+export const REGISTRY_ADDRESS: Address = (ENV_REGISTRY_ADDRESS as Address) || "0x0000000000000000000000000000000000000000"
+
 
 export const TRUST_ANCHOR_ABI = [
+  // --- EVENTS ---
   {
     "anonymous": false,
     "inputs": [
@@ -62,6 +74,26 @@ export const TRUST_ANCHOR_ABI = [
     "name": "approve",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  }
+] as const
+
+export const REGISTRY_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "identity", "type": "address" }, // <-- Добавили identity
+      { "internalType": "address", "name": "newOwner", "type": "address" }
+    ],
+    "name": "changeOwner",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "identity", "type": "address" }],
+    "name": "identityOwner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
     "type": "function"
   }
 ] as const

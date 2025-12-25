@@ -4,26 +4,50 @@ import { TRUST_ANCHOR_ADDRESS, TRUST_ANCHOR_ABI } from '../lib/contracts'
 
 export function useTrustAnchorData() {
   const [proposals, setProposals] = useState<any[]>([])
+  const [approvals, setApprovals] = useState<Record<string, string[]>>({})
   const publicClient = usePublicClient()
 
   // 1. Fetch historical proposals once on load
   useEffect(() => {
     async function fetchHistory() {
       if (!publicClient) return
-      
-      const logs = await publicClient.getContractEvents({
+
+      const proposalLogs = await publicClient.getContractEvents({
         address: TRUST_ANCHOR_ADDRESS,
         abi: TRUST_ANCHOR_ABI,
         eventName: 'ProposalCreated',
-        fromBlock: 0n // Fetch from the beginning of the local chain
+        fromBlock: 0n 
       })
+      
+      // const logs = await publicClient.getContractEvents({
+      //   address: TRUST_ANCHOR_ADDRESS,
+      //   abi: TRUST_ANCHOR_ABI,
+      //   eventName: 'ProposalCreated',
+      //   fromBlock: 0n // Fetch from the beginning of the local chain
+      // })
 
-      const historicalProposals = logs.map((log: any) => ({
+      const historicalProposals = proposalLogs.map((log: any) => ({
         id: log.args.id,
         data: log.args.data,
         requiresUnanimity: log.args.requiresUnanimity,
       }))
       setProposals(historicalProposals)
+
+      const approvalLogs = await publicClient.getContractEvents({
+        address: TRUST_ANCHOR_ADDRESS,
+        abi: TRUST_ANCHOR_ABI,
+        eventName: 'Approved',
+        fromBlock: 0n
+      })
+
+      const newApprovals: Record<string, string[]> = {}
+      approvalLogs.forEach((log: any) => {
+        const pid = log.args.id
+        const owner = log.args.owner
+        if (!newApprovals[pid]) newApprovals[pid] = []
+        if (!newApprovals[pid].includes(owner)) newApprovals[pid].push(owner)
+      })
+      setApprovals(newApprovals)
     }
 
     fetchHistory()
@@ -33,17 +57,17 @@ export function useTrustAnchorData() {
   useWatchContractEvent({
     address: TRUST_ANCHOR_ADDRESS,
     abi: TRUST_ANCHOR_ABI,
-    eventName: 'ProposalCreated',
+    eventName: 'Approved',
     onLogs(logs: any[]) {
-      const newProposals = logs.map((log: any) => ({
-        id: log.args.id,
-        data: log.args.data,
-        requiresUnanimity: log.args.requiresUnanimity,
-      }))
-      // Merge unique proposals only
-      setProposals(prev => {
-        const combined = [...prev, ...newProposals]
-        return Array.from(new Map(combined.map(p => [p.id, p])).values())
+      setApprovals(prev => {
+        const updated = { ...prev }
+        logs.forEach((log: any) => {
+          const pid = log.args.id
+          const owner = log.args.owner
+          if (!updated[pid]) updated[pid] = []
+          if (!updated[pid].includes(owner)) updated[pid].push(owner)
+        })
+        return updated
       })
     },
   })
@@ -71,6 +95,7 @@ export function useTrustAnchorData() {
     quorum: quorum ? Number(quorum) : 0,
     owners,
     proposals,
+    approvals,
     totalAdmins: owners.length,
     isLoading: isQuorumLoading || isOwnersLoading
   }

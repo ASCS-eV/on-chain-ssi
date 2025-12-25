@@ -1,28 +1,41 @@
-import { Building2, Plus, ArrowRight, ShieldAlert, Loader2, CheckCircle2 } from 'lucide-react'
+import { Building2, Plus, ArrowRight, ShieldAlert, Loader2, CheckCircle2, Search } from 'lucide-react'
 import { useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useReadContract } from 'wagmi'
 import { useGovernance } from '../../hooks/useGovernance'
+import { REGISTRY_ADDRESS, REGISTRY_ABI, TRUST_ANCHOR_ADDRESS } from '../../lib/contracts'
 
 export function CompaniesPage() {
   const { isConnected } = useAccount()
-  const [companyAddress, setCompanyAddress] = useState('')
+  const [inputAddress, setInputAddress] = useState('')
+  const [checkAddress, setCheckAddress] = useState<`0x${string}` | undefined>(undefined)
   
-  // Initialize our governance hook logic
   const { proposeCompanyRegistration, isPending, isSuccess, error } = useGovernance()
 
-  // Placeholder list (later we will fetch this from events)
-  const companies = [
-    { name: 'BMW Group', address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', status: 'Managed' },
-  ]
+  // READ: Check who is the actual owner of the entered address in the Registry
+  const { data: currentOwner, isLoading: isChecking } = useReadContract({
+    address: REGISTRY_ADDRESS,
+    abi: REGISTRY_ABI,
+    functionName: 'identityOwner',
+    args: checkAddress ? [checkAddress] : undefined,
+    query: {
+      enabled: !!checkAddress, // Only run query if we have an address to check
+    }
+  })
+
+  // Determine status based on on-chain data
+  const isManaged = currentOwner && TRUST_ANCHOR_ADDRESS && 
+    currentOwner.toLowerCase() === TRUST_ANCHOR_ADDRESS.toLowerCase()
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!companyAddress.startsWith('0x') || companyAddress.length !== 42) {
-      return
-    }
-    
-    // Call the smart contract to create a Proposal
-    proposeCompanyRegistration(companyAddress as `0x${string}`)
+    if (!inputAddress.startsWith('0x') || inputAddress.length !== 42) return
+    proposeCompanyRegistration(inputAddress as `0x${string}`)
+  }
+
+  const handleCheckStatus = () => {
+     if (inputAddress.startsWith('0x')) {
+        setCheckAddress(inputAddress as `0x${string}`)
+     }
   }
 
   return (
@@ -39,32 +52,72 @@ export function CompaniesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Registration Form */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="space-y-6">
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="font-semibold text-slate-800 mb-4 flex items-center">
               <Plus className="w-4 h-4 mr-2 text-indigo-500" />
-              Register New Company
+              Actions
             </h3>
-            <form onSubmit={handleRegister} className="space-y-4">
+            
+            <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">
                   Company Wallet Address
                 </label>
-                <input 
-                  type="text"
-                  value={companyAddress}
-                  onChange={(e) => setCompanyAddress(e.target.value)}
-                  placeholder="0x..."
-                  disabled={isPending}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-sm disabled:bg-slate-50"
-                />
+                <div className="flex gap-2">
+                    <input 
+                    type="text"
+                    value={inputAddress}
+                    onChange={(e) => {
+                        setInputAddress(e.target.value)
+                        setCheckAddress(undefined) // Reset check on type
+                    }}
+                    placeholder="0x..."
+                    disabled={isPending}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-sm disabled:bg-slate-50"
+                    />
+                    <button
+                        type="button" 
+                        onClick={handleCheckStatus}
+                        className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                        title="Check current status"
+                    >
+                        <Search className="w-4 h-4" />
+                    </button>
+                </div>
               </div>
 
+              {/* Status Display Area */}
+              {checkAddress && (
+                  <div className={`p-4 rounded-lg border ${isManaged ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
+                      <h4 className="text-sm font-semibold mb-1">Current Status:</h4>
+                      {isChecking ? (
+                          <span className="text-sm text-slate-500">Checking registry...</span>
+                      ) : (
+                          <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                  <span className="text-sm text-slate-600">Is Managed?</span>
+                                  {isManaged ? (
+                                      <span className="px-2 py-0.5 rounded-full bg-green-200 text-green-800 text-xs font-bold">YES (Managed by TA)</span>
+                                  ) : (
+                                      <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-xs font-medium">NO (Independent)</span>
+                                  )}
+                              </div>
+                              <div className="text-xs text-slate-400 font-mono break-all">
+                                  Owner: {currentOwner}
+                              </div>
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-100"></div>
+
               <button 
-                type="submit"
-                disabled={!isConnected || !companyAddress || isPending}
+                onClick={handleRegister}
+                disabled={!isConnected || !inputAddress || isPending}
                 className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
                 {isPending ? (
@@ -74,17 +127,16 @@ export function CompaniesPage() {
                   </>
                 ) : (
                   <>
-                    Propose Registration
+                    Propose Registration (Change Owner)
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </>
                 )}
               </button>
 
-              {/* Transaction Status Messages */}
               {isSuccess && (
                 <div className="flex items-center text-green-600 text-sm mt-2 p-2 bg-green-50 rounded">
                   <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Proposal created! Now other admins must approve it.
+                  Proposal created! Check Dashboard to vote.
                 </div>
               )}
 
@@ -93,31 +145,24 @@ export function CompaniesPage() {
                   Error: {error.message.split('.')[0]}
                 </div>
               )}
-            </form>
+            </div>
           </div>
         </div>
 
-        {/* Companies List */}
-        <div className="lg:col-span-2">
+        {/* Info / Companies List Placeholder */}
+        <div className="space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h3 className="font-semibold text-slate-800 flex items-center">
                 <Building2 className="w-4 h-4 mr-2 text-indigo-500" />
-                Managed Companies
+                Verified Companies
               </h3>
             </div>
-            <div className="divide-y divide-slate-100">
-              {companies.map((company, idx) => (
-                <div key={idx} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div>
-                    <h4 className="font-medium text-slate-900">{company.name}</h4>
-                    <p className="text-xs font-mono text-slate-500 mt-1">{company.address}</p>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
-                    {company.status}
-                  </span>
-                </div>
-              ))}
+            <div className="p-6 text-center text-slate-500 text-sm">
+                <p>Enter an address on the left and click the <Search className="w-3 h-3 inline mx-1"/> icon to verify its on-chain status.</p>
+                <p className="mt-4 text-xs bg-slate-50 p-2 rounded">
+                    Once a company delegates control and the Trust Anchor approves it, the status will change to <strong>Managed</strong>.
+                </p>
             </div>
           </div>
         </div>

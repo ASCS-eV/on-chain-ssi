@@ -5,11 +5,14 @@ import { useGovernance } from '../../hooks/useGovernance'
 import { useAccount } from 'wagmi'
 
 export function TrustAnchorDashboard() {
-  // Extract data from our custom hook
-  // Added isLoading here to fix the white screen error
-  const { quorum, owners, proposals, totalAdmins, isLoading } = useTrustAnchorData()
-  const { isConnected } = useAccount()
+  const { quorum, owners, proposals, totalAdmins, approvals, isLoading } = useTrustAnchorData()
+  const { isConnected, address } = useAccount()
   const { approveProposal, isPending } = useGovernance()
+
+  // Check if current user is an admin
+  const isTrustAnchorAdmin = isConnected && address && owners.some(
+    (owner) => owner.toLowerCase() === address.toLowerCase()
+  )
 
   return (
     <div className="space-y-8">
@@ -48,31 +51,65 @@ export function TrustAnchorDashboard() {
         
         <div className="divide-y divide-slate-100">
           {proposals.length > 0 ? (
-            proposals.map((p, idx) => (
-              <div key={idx} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-all">
-                <div className="flex items-start gap-4">
-                  <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-                    <Clock className="w-5 h-5" />
+            proposals.map((p, idx) => {
+              const hasVoted = address && approvals[p.id]?.includes(address)
+              
+              const currentVotes = approvals[p.id]?.length || 0
+              const requiredVotes = Number(quorum) || 2
+              const progressPercent = Math.min((currentVotes / requiredVotes) * 100, 100)
+
+              // Button is disabled if: Not connected OR Pending tx OR Voted OR Not an Admin
+              const isDisabled = !isConnected || isPending || hasVoted || !isTrustAnchorAdmin
+
+              return (
+                <div key={idx} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-all">
+                  <div className="flex items-start gap-4">
+                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-mono text-slate-500 uppercase tracking-tight">
+                        Proposal ID: {p.id.slice(0, 10)}...
+                      </p>
+                      <p className="font-medium text-slate-900 mt-1">
+                        {p.requiresUnanimity ? 'Critical Action: Ownership/Admins' : 'Routine Update'}
+                      </p>
+                      
+                      {/* Voting Progress */}
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 w-24 bg-slate-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-indigo-500 transition-all duration-500" 
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-slate-600">
+                          {currentVotes} / {requiredVotes} Votes
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-mono text-slate-500 uppercase tracking-tight">
-                      Proposal ID: {p.id.slice(0, 14)}...
-                    </p>
-                    <p className="font-medium text-slate-900 mt-1">
-                      {p.requiresUnanimity ? 'Critical Action: Ownership/Admins' : 'Routine Identity Update'}
-                    </p>
-                  </div>
+                  
+                  <button 
+                    onClick={() => approveProposal(p.id)}
+                    disabled={isDisabled}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isDisabled
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                        : 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
+                    }`}
+                  >
+                    {!isTrustAnchorAdmin && isConnected ? (
+                       <>Unauthorized</>
+                    ) : hasVoted ? (
+                       <><CheckCircle className="w-4 h-4" /> Voted</>
+                    ) : (
+                       <><CheckCircle className="w-4 h-4" /> {isPending ? 'Signing...' : 'Approve'}</>
+                    )}
+                  </button>
                 </div>
-                <button 
-                  onClick={() => approveProposal(p.id)}
-                  disabled={!isConnected || isPending}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  {isPending ? 'Confirming...' : 'Approve'}
-                </button>
-              </div>
-            ))
+              )
+            })
           ) : (
             <div className="p-12 text-center text-slate-400">
               <ShieldCheck className="w-12 h-12 mx-auto mb-4 opacity-20" />
