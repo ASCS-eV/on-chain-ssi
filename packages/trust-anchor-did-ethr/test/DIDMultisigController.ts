@@ -3,7 +3,7 @@ import { describe, it, beforeEach } from "node:test";
 import { network } from "hardhat";
 import { keccak256, toHex, encodeFunctionData, parseAbiItem } from "viem";
 
-describe("DIDMultisigController (Refactored)", async function () {
+describe("DIDMultisigController", async function () {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
   const [owner1, owner2, owner3, companyAdmin, randomUser] = await viem.getWalletClients();
@@ -33,16 +33,19 @@ describe("DIDMultisigController (Refactored)", async function () {
     // Create a "Company" identity and assign the Multisig as its owner
     companyDid = randomUser.account.address;
 
-    // FIX: Pass TWO arguments: [identity, newOwner]
+    // Pass TWO arguments: [identity, newOwner]
     await registry.write.changeOwner(
         [companyDid, multisig.address],
         { account: randomUser.account }
     );
   });
 
-  // --- REQUIREMENT: Single Admin Manage Company ---
-  it("Single admin can update Company DID attributes (Speed Layer)", async () => {
-    const attrName = keccak256(toHex("did/service/Company"));
+
+  // TESTs of desired features for identity of companies
+
+  // --- REQUIREMENT: Single Admin Manage Company's DID document service section---
+  it("Single trust anchor admin can update Company's DID document service section", async () => {
+    const attrName = keccak256(toHex("did/service/Company")); //TODO: change to "did/svc/company" so that we follow the guide of did:ethr: https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#service-endpoints
     const attrValue = toHex("https://company.com");
 
     // Encode the registry call
@@ -66,11 +69,33 @@ describe("DIDMultisigController (Refactored)", async function () {
     // Find event for companyDid
     const event = eventLogs.find((e:any) => e.args.identity.toLowerCase() === companyDid.toLowerCase());
     assert.ok(event, "Attribute should be changed by single admin");
+
+    // TODO optional: change the same service section attribute again to ensure complete update of service section [this is only an optional TODO because a service section update is not necessary if trust anchor set the pointer to the CRSet smart contract as this only requires setting the service section but never updating it]
   });
 
-  // --- REQUIREMENT: Single Admin CANNOT Manage TA Identity ---
+    // --- REQUIREMENT: Single Admin Manage Company's DID document verificationMethod section---
+  it("Single trust anchor admin can update Company's DID document verificationMethodsection", async () => {
+    // TODO while following this guide: https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#public-keys
+    // TODO: after adding a company admin's public key under the verificationMethod also enable its removal by updating the same verificationMethod attribute
+  });
+
+  // --- REQUIREMENT: Single trust anchor admin adds company admin as delegate of company's did:ethr  ---
+  it("Single trust anchor admin adds company admin as delegate of company's did:ethr", async () => {
+    // TODO
+  });
+
+  // --- REQUIREMENT: Single trust anchor admin removes company admin as delegate of company's did:ethr  ---
+  it("Single trust anchor admin removes company admin as delegate of company's did:ethr", async () => {
+    // TODO
+  });
+
+
+
+  // TESTs of desired features for identity of trust anchor
+
+    // --- REQUIREMENT: Single Admin CANNOT Manage TA Identity ---
   it("Single admin CANNOT update Trust Anchor DID attributes directly", async () => {
-    const attrName = keccak256(toHex("did/service/TA"));
+    const attrName = keccak256(toHex("did/service/TA")); //TODO: change to "did/svc/trust-anchor" so that we follow the guide of did:ethr: https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#service-endpoints
     // Attempting to modify multisig.address (TA Identity)
     const data = encodeFunctionData({
       abi: registry.abi,
@@ -87,7 +112,7 @@ describe("DIDMultisigController (Refactored)", async function () {
 
   // --- REQUIREMENT: Quorum for TA Identity ---
   it("Trust Anchor Attribute updates require Quorum", async () => {
-    const attrName = keccak256(toHex("did/service/TA"));
+    const attrName = keccak256(toHex("did/service/TA")); //TODO: change to "did/svc/trust-anchor" so that we follow the guide of did:ethr: https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#service-endpoints
     const id = await getProposalId(
         multisig.write.proposeSetAttribute([attrName, toHex("ok"), 3600n], { account: owner1.account })
     );
@@ -95,6 +120,8 @@ describe("DIDMultisigController (Refactored)", async function () {
     // 1 signature: Not executed (Quorum is 2)
     // Owner 1 must approve explicitly now (logic consistency)
     await multisig.write.approve([id], { account: owner1.account });
+
+    // TODO: verify no "DIDAttributeChanged" event yet emitted
 
     // 2 signatures (Quorum reached)
     await multisig.write.approve([id], { account: owner2.account });
@@ -109,7 +136,7 @@ describe("DIDMultisigController (Refactored)", async function () {
     assert.ok(event, "Event for TA should be emitted after quorum");
   });
 
-  // --- REQUIREMENT: Unanimity for Ownership ---
+  // --- REQUIREMENT: Unanimity for trust anchor's did:ethr ownership change ---
   it("ChangeOwner requires Unanimity (3/3)", async () => {
     const newOwner = companyAdmin.account.address;
 
@@ -132,7 +159,7 @@ describe("DIDMultisigController (Refactored)", async function () {
     assert.equal(currentOwner.toLowerCase(), newOwner.toLowerCase());
   });
 
-  // --- REQUIREMENT: Add/Remove Owner ---
+  // --- REQUIREMENT: Add Owner ---
   it("Add Owner requires Unanimity", async () => {
     const id = await getProposalId(
         multisig.write.proposeAddOwner([companyAdmin.account.address], { account: owner1.account })
@@ -150,4 +177,19 @@ describe("DIDMultisigController (Refactored)", async function () {
     isOwner = await multisig.read.isOwner([companyAdmin.account.address]);
     assert.equal(isOwner, true);
   });
+
+  // --- REQUIREMENT: Remove Owner ---
+  it("Remove Owner requires Unanimity", async () => {
+    // TODO
+  });
+
+  // --- REQUIREMENT: unanimous update quorum threshold  ---
+  it("Quorum update requires Unanimity", async () => {
+    // TODO
+  });
 });
+
+// TODO optional: testing security of contracts for production deployment
+// TESTs for security
+
+// --- REQUIREMENT: trust anchor admins cannot administer company DID of other trust anchor---
