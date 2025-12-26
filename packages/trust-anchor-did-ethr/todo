@@ -1,2 +1,1 @@
-fix the failing hardhat tests
 ensure that desired behaviour of did:ethr identifier and mandatory workflow are achieved with current DIDMultisgController.sol (see [readme file](./README.md))
