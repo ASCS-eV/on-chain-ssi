@@ -9,7 +9,6 @@ export function TrustAnchorDashboard() {
   const { isConnected, address } = useAccount()
   const { approveProposal, isPending } = useGovernance()
 
-  // Check if current user is an admin
   const isTrustAnchorAdmin = isConnected && address && owners.some(
     (owner) => owner.toLowerCase() === address.toLowerCase()
   )
@@ -37,7 +36,7 @@ export function TrustAnchorDashboard() {
         />
         <StatCard 
           title="Companies" 
-          value="1" 
+          value="-" 
           icon={<Globe className="w-5 h-5" />}
           description="Controlled Entities"
         />
@@ -53,12 +52,11 @@ export function TrustAnchorDashboard() {
           {proposals.length > 0 ? (
             proposals.map((p, idx) => {
               const hasVoted = address && approvals[p.id]?.includes(address)
-              
               const currentVotes = approvals[p.id]?.length || 0
-              const requiredVotes = Number(quorum) || 2
+              
+              // Note: using p.rawInfo because we updated the Type in hook
+              const requiredVotes = p.rawInfo.requiresUnanimity ? totalAdmins : quorum 
               const progressPercent = Math.min((currentVotes / requiredVotes) * 100, 100)
-
-              // Button is disabled if: Not connected OR Pending tx OR Voted OR Not an Admin
               const isDisabled = !isConnected || isPending || hasVoted || !isTrustAnchorAdmin
 
               return (
@@ -68,15 +66,22 @@ export function TrustAnchorDashboard() {
                       <Clock className="w-5 h-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-mono text-slate-500 uppercase tracking-tight">
-                        Proposal ID: {p.id.slice(0, 10)}...
-                      </p>
-                      <p className="font-medium text-slate-900 mt-1">
-                        {p.requiresUnanimity ? 'Critical Action: Ownership/Admins' : 'Routine Update'}
+                      {/* HERE IS THE FIX: DISPLAY DECODED DESCRIPTION */}
+                      <p className="text-lg font-bold text-slate-900">
+                        {p.description}
                       </p>
                       
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                            p.rawInfo.requiresUnanimity ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                            {p.rawInfo.requiresUnanimity ? 'Unanimity' : 'Standard'}
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">ID: {p.id.slice(0, 8)}...</span>
+                      </div>
+                      
                       {/* Voting Progress */}
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-3 flex items-center gap-2">
                         <div className="h-1.5 w-24 bg-slate-200 rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-indigo-500 transition-all duration-500" 
@@ -91,7 +96,7 @@ export function TrustAnchorDashboard() {
                   </div>
                   
                   <button 
-                    onClick={() => approveProposal(p.id)}
+                    onClick={() => approveProposal(p.id as `0x${string}`)}
                     disabled={isDisabled}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isDisabled
@@ -146,13 +151,6 @@ export function TrustAnchorDashboard() {
                   </td>
                 </tr>
               ))}
-              {!isLoading && owners.length === 0 && (
-                <tr>
-                  <td colSpan={2} className="px-6 py-10 text-center text-slate-400">
-                    No admins detected. Ensure your local node is running.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
