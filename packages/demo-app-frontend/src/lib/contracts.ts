@@ -2,6 +2,7 @@ import { type Address } from "viem";
 
 const ENV_TRUST_ANCHOR_ADDRESS = import.meta.env.VITE_TRUST_ANCHOR_ADDRESS;
 const ENV_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS;
+const ENV_CRSET_REGISTRY_ADDRESS = import.meta.env.VITE_CRSET_REGISTRY_ADDRESS;
 
 if (!ENV_TRUST_ANCHOR_ADDRESS || !ENV_TRUST_ANCHOR_ADDRESS.startsWith("0x")) {
   console.error("CRITICAL: Trust Anchor Address not set in .env");
@@ -9,12 +10,18 @@ if (!ENV_TRUST_ANCHOR_ADDRESS || !ENV_TRUST_ANCHOR_ADDRESS.startsWith("0x")) {
 if (!ENV_REGISTRY_ADDRESS || !ENV_REGISTRY_ADDRESS.startsWith("0x")) {
   console.error("CRITICAL: Registry Address not set in .env");
 }
+if (!ENV_CRSET_REGISTRY_ADDRESS || !ENV_CRSET_REGISTRY_ADDRESS.startsWith("0x")) {
+  console.error("CRITICAL: CRSet Registry Address not set in .env");
+}
 
 export const TRUST_ANCHOR_ADDRESS: Address =
   (ENV_TRUST_ANCHOR_ADDRESS as Address) ||
   "0x0000000000000000000000000000000000000000";
 export const REGISTRY_ADDRESS: Address =
   (ENV_REGISTRY_ADDRESS as Address) ||
+  "0x0000000000000000000000000000000000000000";
+export const CRSET_REGISTRY_ADDRESS: Address =
+  (ENV_CRSET_REGISTRY_ADDRESS as Address) ||
   "0x0000000000000000000000000000000000000000";
 
 export const TRUST_ANCHOR_ABI = [
@@ -111,6 +118,16 @@ export const TRUST_ANCHOR_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [
+      { internalType: "address", name: "target", type: "address" },
+      { internalType: "bytes", name: "data", type: "bytes" },
+    ],
+    name: "execCall",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
   // --- INTERNAL TARGET FUNCTIONS (Needed for Decoding) ---
   {
     inputs: [{ internalType: "uint256", name: "newQuorum", type: "uint256" }],
@@ -162,5 +179,78 @@ export const REGISTRY_ABI = [
     outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "identity", type: "address" },
+      { internalType: "bytes32", name: "name", type: "bytes32" },
+      { internalType: "bytes", name: "value", type: "bytes" },
+      { internalType: "uint256", name: "validity", type: "uint256" },
+    ],
+    name: "setAttribute",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export const CRSET_REGISTRY_ABI = [
+  {
+    inputs: [
+      { internalType: "address", name: "companyDID", type: "address" },
+      { internalType: "address", name: "admin", type: "address" },
+    ],
+    name: "addCompanyAdmin",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "companyDID", type: "address" },
+      { internalType: "address", name: "admin", type: "address" },
+    ],
+    name: "removeCompanyAdmin",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "companyDID", type: "address" },
+      { internalType: "string", name: "newCID", type: "string" },
+    ],
+    name: "updateRevocationCID",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "companyDID", type: "address" },
+    ],
+    name: "getRevocationCID",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "companyDID", type: "address" },
+      { internalType: "address", name: "admin", type: "address" },
+    ],
+    name: "isCompanyAdmin",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "companyDID", type: "address" },
+      { indexed: false, internalType: "string", name: "newCID", type: "string" },
+    ],
+    name: "RevocationCIDUpdated",
+    type: "event",
   },
 ] as const;

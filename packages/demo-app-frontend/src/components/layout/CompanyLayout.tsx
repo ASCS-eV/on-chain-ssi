@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { SatelliteDishIcon, Building, LogOut } from 'lucide-react'
+import { SatelliteDishIcon, Building, LogOut, ListX } from 'lucide-react'
 import { useAccount, useDisconnect, useConnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 
@@ -16,6 +16,7 @@ export function CompanyLayout({ children }: CompanyLayoutProps) {
 
   const navItems = [
     { label: 'Onboarding', path: '/company/onboarding', icon: SatelliteDishIcon },
+    { label: 'Revocation List', path: '/company/revocations', icon: ListX },
   ]
 
   const shortAddress = address 
