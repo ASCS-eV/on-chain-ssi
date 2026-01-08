@@ -145,7 +145,7 @@ describe("DIDMultisigController", async function () {
   // TESTs of desired features for identity of trust anchor
 
   // --- REQUIREMENT: Single Admin CANNOT Manage TA Identity ---
-  it("Single trust anchoradmin CANNOT update Trust Anchor DID attributes", async () => {
+  it("Single trust anchor admin CANNOT update Trust Anchor DID attributes", async () => {
     const attrName = keccak256(toHex("did/svc/TA")); 
     const data = encodeFunctionData({
       abi: registry.abi,
