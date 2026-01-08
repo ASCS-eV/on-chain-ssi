@@ -145,7 +145,7 @@ describe("DIDMultisigController", async function () {
   // TESTs of desired features for identity of trust anchor
 
   // --- REQUIREMENT: Single Admin CANNOT Manage TA Identity ---
-  it("Single admin CANNOT update Trust Anchor DID attributes directly", async () => {
+  it("Single trust anchoradmin CANNOT update Trust Anchor DID attributes", async () => {
     const attrName = keccak256(toHex("did/svc/TA")); 
     const data = encodeFunctionData({
       abi: registry.abi,
@@ -160,7 +160,7 @@ describe("DIDMultisigController", async function () {
   });
 
   // --- REQUIREMENT: Quorum for TA Identity ---
-  it("Trust Anchor Attribute updates require Quorum", async () => {
+  it("Update of trust anchor DID attributes requires quorum", async () => {
     const attrName = keccak256(toHex("did/svc/TA")); 
     const id = await getProposalId(
         multisig.write.proposeSetAttribute([attrName, toHex("ok"), 3600n], { account: owner1.account })
@@ -169,17 +169,26 @@ describe("DIDMultisigController", async function () {
     // 1 signature: Not executed (Quorum is 2)
     await multisig.write.approve([id], { account: owner1.account });
 
-    // 2 signatures (Quorum reached)
-    await multisig.write.approve([id], { account: owner2.account });
-
-    const events = await publicClient.getContractEvents({
+    // verify no "DIDAttributeChanged" event yet emitted due to lack of quorum
+    const eventsAfter1st = await publicClient.getContractEvents({
       address: registry.address,
       abi: registry.abi,
       eventName: "DIDAttributeChanged"
     });
+    const eventAfter1st = eventsAfter1st.find((e:any) => e.args.identity.toLowerCase() === multisig.address.toLowerCase());
+    assert.ok(!eventAfter1st, "Event for TA DID update should NOT be emitted yet");
 
-    const event = events.find((e:any) => e.args.identity.toLowerCase() === multisig.address.toLowerCase());
-    assert.ok(event, "Event for TA should be emitted after quorum");
+    // 2 signatures (Quorum reached)
+    await multisig.write.approve([id], { account: owner2.account });
+
+    // verify emission of "DIDAttributeChanged" event after quorum reached
+    const eventsAfter2nd = await publicClient.getContractEvents({
+      address: registry.address,
+      abi: registry.abi,
+      eventName: "DIDAttributeChanged"
+    });
+    const eventAfterQuorum = eventsAfter2nd.find((e:any) => e.args.identity.toLowerCase() === multisig.address.toLowerCase() && e.args.value === toHex("ok"));
+    assert.ok(eventAfterQuorum, "Event for TA DID update should be emitted after quorum");
   });
 
   // --- REQUIREMENT: Unanimity for trust anchor's did:ethr ownership change ---
