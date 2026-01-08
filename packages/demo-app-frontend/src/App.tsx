@@ -11,6 +11,7 @@ import { TrustAnchorDashboard } from './pages/trust-anchor/Dashboard'
 import { CompaniesPage } from './pages/trust-anchor/Companies'
 import { GovernancePage } from './pages/trust-anchor/Governance' // <-- Import
 import { CompanyOnboardingPage } from './pages/company/Onboarding'
+import { RevocationListPage } from './pages/company/RevocationList'
 
 const queryClient = new QueryClient()
 
@@ -39,6 +40,7 @@ function App() {
                 <CompanyLayout>
                   <Routes>
                     <Route path="/onboarding" element={<CompanyOnboardingPage />} />
+                    <Route path="/revocations" element={<RevocationListPage />} />
                   </Routes>
                 </CompanyLayout>
               </ProtectedRoute>
