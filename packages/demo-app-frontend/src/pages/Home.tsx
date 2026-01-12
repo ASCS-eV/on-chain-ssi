@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAccount, useConnect } from 'wagmi'
 import { injected } from 'wagmi/connectors'
-import { ArrowRight, Loader2, Shield, Globe, Lock, Cpu } from 'lucide-react'
+import { Loader2, Shield, Globe, Lock, Cpu, AlertCircle, ArrowRight } from 'lucide-react'
 import { useTrustAnchorData } from '../hooks/useTrustAnchor'
 
 // --- SCROLL REVEAL COMPONENT ---
@@ -39,7 +39,8 @@ export function HomePage() {
   const navigate = useNavigate()
   const { address, isConnected, isConnecting } = useAccount()
   const { connect } = useConnect()
-  const { owners, isLoading: isTaLoading } = useTrustAnchorData()
+  // Fetch isError
+  const { owners, isLoading: isTaLoading, isError: isTaError } = useTrustAnchorData()
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -47,7 +48,8 @@ export function HomePage() {
 
   // --- AUTO-REDIRECT LOGIC ---
   useEffect(() => {
-    if (isConnected && !isTaLoading && owners && address) {
+    // Only redirect if connected AND NO ERROR AND Data Loaded
+    if (isConnected && !isTaLoading && !isTaError && owners && address) {
       const isTrustAnchorAdmin = owners.some(
         (owner) => owner.toLowerCase() === address.toLowerCase()
       )
@@ -57,7 +59,7 @@ export function HomePage() {
         navigate('/company/onboarding')
       }
     }
-  }, [isConnected, isTaLoading, owners, address, navigate])
+  }, [isConnected, isTaLoading, isTaError, owners, address, navigate])
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-indigo-100 overflow-x-hidden">
@@ -113,10 +115,17 @@ export function HomePage() {
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4">
                         {isConnected ? (
-                            <div className="flex items-center gap-3 bg-white px-6 py-4 rounded-xl border border-slate-200 shadow-sm animate-pulse">
-                                <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-                                <span className="font-medium text-slate-700">Accessing Portal...</span>
-                            </div>
+                            isTaError ? (
+                                <div className="flex items-center gap-3 bg-red-50 px-6 py-4 rounded-xl border border-red-200">
+                                    <AlertCircle className="w-5 h-5 text-red-600" />
+                                    <span className="font-medium text-red-700">Network Error. Check Console/RPC.</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-white px-6 py-4 rounded-xl border border-slate-200 shadow-sm animate-pulse">
+                                    <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                                    <span className="font-medium text-slate-700">Accessing Portal...</span>
+                                </div>
+                            )
                         ) : (
                             <button
                                 onClick={() => connect({ connector: injected() })}

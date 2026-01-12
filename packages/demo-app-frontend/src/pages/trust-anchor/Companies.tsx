@@ -1,381 +1,257 @@
-import { Plus, ArrowRight, ShieldAlert, Loader2, CheckCircle2, AlertTriangle, UserPlus, UserMinus, RefreshCw } from 'lucide-react'
+import { Plus, Loader2, CheckCircle2, AlertTriangle, Search, Building2, UserPlus, UserMinus, RefreshCw } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { useGovernance } from '../../hooks/useGovernance'
 import { useCRSetManagement } from '../../hooks/useCRSetManagement'
 import { useDIDSync, useReadCID } from '../../hooks/useDIDSync'
 import { REGISTRY_ADDRESS, REGISTRY_ABI, TRUST_ANCHOR_ADDRESS } from '../../lib/contracts'
+import { isAddress } from 'viem'
+import { toast } from 'sonner'
 
 export function CompaniesPage() {
   const { isConnected } = useAccount()
   const [inputAddress, setInputAddress] = useState('')
-  const [checkAddress, setCheckAddress] = useState<`0x${string}` | undefined>(undefined)
+  const [debouncedAddress, setDebouncedAddress] = useState<`0x${string}` | undefined>(undefined)
   
-  // CRSet admin management
-  const [adminCompanyDID, setAdminCompanyDID] = useState('')
+  // State for Admin Tools
   const [adminAddress, setAdminAddress] = useState('')
-  
-  // DID sync management, this is manual now, we could use a cron job from the crset backend later, or an oracle, or change the approach after meeting
-  // DID sync refers to syncing the revocation CID from CRSetRegistry to the DID document in Registry
-  const [syncCompanyDID, setSyncCompanyDID] = useState('')
-  const [syncCheckDID, setSyncCheckDID] = useState<`0x${string}` | undefined>(undefined)
-  
-  const { proposeCompanyRegistration, isPending, isSuccess, error } = useGovernance()
-  const { 
-    addCompanyAdmin, 
-    removeCompanyAdmin, 
-    isPending: isAdminPending, 
-    isSuccess: isAdminSuccess, 
-    error: adminError 
-  } = useCRSetManagement()
 
-  const { syncCIDToDID, isPending: isSyncPending, isSuccess: isSyncSuccess, error: syncError } = useDIDSync()
-  
-  // Debounce sync company DID check
+  // Hooks
+  const { proposeCompanyRegistration, isPending } = useGovernance()
+  const { addCompanyAdmin, removeCompanyAdmin, isPending: isAdminPending, isSuccess: isAdminSuccess } = useCRSetManagement()
+  const { syncCIDToDID, isPending: isSyncPending, isSuccess: isSyncSuccess } = useDIDSync()
+  const { cid: companyCID, isLoading: isCIDLoading } = useReadCID(debouncedAddress)
+
+  // Debounce Search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (syncCompanyDID.startsWith('0x') && syncCompanyDID.length === 42) {
-        setSyncCheckDID(syncCompanyDID as `0x${string}`)
-      } else {
-        setSyncCheckDID(undefined)
-      }
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [syncCompanyDID])
-
-  const { cid: companyCID, isLoading: isLoadingCID } = useReadCID(syncCheckDID)
-
-  // DEBOUNCE LOGIC
-  useEffect(() => {
-    const timer = setTimeout(() => {
-        if (inputAddress.startsWith('0x') && inputAddress.length === 42) {
-            setCheckAddress(inputAddress as `0x${string}`)
+        if (isAddress(inputAddress)) {
+            setDebouncedAddress(inputAddress as `0x${string}`)
         } else {
-            setCheckAddress(undefined)
+            setDebouncedAddress(undefined)
         }
-    }, 500) // 500ms debounce
-
+    }, 500)
     return () => clearTimeout(timer)
   }, [inputAddress])
 
+  // Notifications for side-effects
+  useEffect(() => {
+      if (isAdminSuccess) toast.success("Admin Updated Successfully")
+      if (isSyncSuccess) toast.success("DID Document Synced Successfully")
+  }, [isAdminSuccess, isSyncSuccess])
 
-  // READ Registry Status
+  // READ Status
   const { data: currentOwner, isLoading: isChecking } = useReadContract({
     address: REGISTRY_ADDRESS,
     abi: REGISTRY_ABI,
     functionName: 'identityOwner',
-    args: checkAddress ? [checkAddress] : undefined,
-    query: { enabled: !!checkAddress }
+    args: debouncedAddress ? [debouncedAddress] : undefined,
+    query: { enabled: !!debouncedAddress }
   })
 
-  // STATES:
-  // 1. Managed: Owner is TA.
+  // Determine Status
   const isManaged = currentOwner && TRUST_ANCHOR_ADDRESS && 
     currentOwner.toLowerCase() === TRUST_ANCHOR_ADDRESS.toLowerCase()
 
-  // 2. Ready: Owner is neither TA nor Self? (Or implicitly, if we want to support a transition state, usually it's just Managed vs Not)
-  // Logic: Use "Ready to Propose" only if it's Managed. If it's waiting, we block.
-  const isReadyForProposal = isManaged
-
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!checkAddress) return
-    proposeCompanyRegistration(checkAddress)
+  const handleRegister = () => {
+    if (!debouncedAddress) return
+    proposeCompanyRegistration(debouncedAddress)
   }
 
-  // admin and crset syncing handlers
-
+  // Admin Handlers
   const handleAddAdmin = () => {
-    if (!adminCompanyDID || !adminAddress) return
-    addCompanyAdmin(adminCompanyDID as `0x${string}`, adminAddress as `0x${string}`)
+      if (!debouncedAddress || !adminAddress) return
+      addCompanyAdmin(debouncedAddress, adminAddress as `0x${string}`)
   }
 
   const handleRemoveAdmin = () => {
-    if (!adminCompanyDID || !adminAddress) return
-    removeCompanyAdmin(adminCompanyDID as `0x${string}`, adminAddress as `0x${string}`)
+      if (!debouncedAddress || !adminAddress) return
+      removeCompanyAdmin(debouncedAddress, adminAddress as `0x${string}`)
   }
 
-  const handleSyncCID = () => {
-    if (!syncCheckDID || !companyCID) return
-    syncCIDToDID(syncCheckDID, companyCID)
+  const handleSync = () => {
+      if (!debouncedAddress || !companyCID) return
+      syncCIDToDID(debouncedAddress, companyCID)
+  }
+
+  // --- UI RENDERERS ---
+
+  const renderStatus = () => {
+      if (!inputAddress) return (
+          <div className="text-center py-12 text-slate-400">
+              <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p>Enter a DID address to check status</p>
+          </div>
+      )
+      
+      if (!isAddress(inputAddress)) return (
+          <div className="text-center py-12 text-red-400">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p>Invalid Ethereum Address</p>
+          </div>
+      )
+
+      if (isChecking) return (
+          <div className="text-center py-12 text-slate-500">
+              <Loader2 className="w-10 h-10 mx-auto mb-3 animate-spin text-indigo-500" />
+              <p>Verifying Identity Status...</p>
+          </div>
+      )
+
+      return (
+          <div className="animate-in fade-in slide-in-from-bottom-2">
+              <div className={`p-6 rounded-xl border-2 ${
+                  isManaged ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'
+              }`}>
+                  <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-full ${
+                          isManaged ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+                      }`}>
+                          {isManaged ? <CheckCircle2 className="w-6 h-6"/> : <AlertTriangle className="w-6 h-6"/>}
+                      </div>
+                      <div className="flex-1">
+                          <h4 className="text-lg font-bold text-slate-900">
+                              {isManaged ? 'Identity is Managed' : 'Action Required'}
+                          </h4>
+                          <p className="text-slate-600 mt-1">
+                              {isManaged 
+                                  ? "This identity is correctly delegated to the Trust Anchor." 
+                                  : "This identity is NOT controlled by the Trust Anchor."}
+                          </p>
+                          
+                          {!isManaged && (
+                             <div className="mt-4 bg-white p-4 rounded-lg border border-amber-200 text-sm text-slate-600">
+                                 <strong>Next Step:</strong> The company must delegate control using their wallet via the Company Onboarding portal.
+                             </div>
+                          )}
+                      </div>
+                  </div>
+              </div>
+
+              {isManaged && (
+                  <div className="mt-6">
+                      <button 
+                        onClick={handleRegister}
+                        disabled={isPending || !isConnected}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        {isPending ? (
+                            <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Creating Proposal...</>
+                        ) : (
+                            <><Plus className="w-5 h-5 mr-2" /> Register Company (Create Proposal)</>
+                        )}
+                      </button>
+                      <p className="text-xs text-center text-slate-400 mt-3">
+                          This will create a governance proposal to officialy register the company.
+                      </p>
+                  </div>
+              )}
+          </div>
+      )
+  }
+
+  // --- RESTORED FUNCTIONALITY ---
+  const renderAdvancedTools = () => {
+      if (!isManaged || !debouncedAddress) return null;
+
+      return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 animate-in fade-in">
+              {/* TOOL 1: ADMIN MANAGEMENT */}
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <UserPlus className="w-5 h-5 text-emerald-600" />
+                      CRSet Admins
+                  </h3>
+                  <div className="space-y-3">
+                      <input 
+                          type="text" 
+                          placeholder="Admin Wallet Address (0x...)"
+                          value={adminAddress}
+                          onChange={(e) => setAdminAddress(e.target.value)}
+                          className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                      <div className="flex gap-2">
+                          <button 
+                              onClick={handleAddAdmin}
+                              disabled={isAdminPending || !adminAddress}
+                              className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex justify-center items-center"
+                          >
+                              {isAdminPending ? <Loader2 className="w-4 h-4 animate-spin"/> : <><UserPlus className="w-4 h-4 mr-1"/> Add</>}
+                          </button>
+                          <button 
+                              onClick={handleRemoveAdmin}
+                              disabled={isAdminPending || !adminAddress}
+                              className="flex-1 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50 flex justify-center items-center"
+                          >
+                              {isAdminPending ? <Loader2 className="w-4 h-4 animate-spin"/> : <><UserMinus className="w-4 h-4 mr-1"/> Remove</>}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+
+              {/* TOOL 2: DID SYNC */}
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <RefreshCw className="w-5 h-5 text-blue-600" />
+                      DID Synchronization
+                  </h3>
+                  <div className="space-y-4">
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <p className="text-xs text-slate-500 uppercase font-bold mb-1">Current Registry CID</p>
+                          {isCIDLoading ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-slate-400"/>
+                          ) : (
+                              <p className="font-mono text-sm text-slate-800 break-all">{companyCID || "No CID found"}</p>
+                          )}
+                      </div>
+                      <button 
+                          onClick={handleSync}
+                          disabled={isSyncPending || !companyCID}
+                          className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex justify-center items-center"
+                      >
+                          {isSyncPending ? (
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Syncing...</>
+                          ) : (
+                              <><RefreshCw className="w-4 h-4 mr-2"/> Sync to DID Document</>
+                          )}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Company Management</h1>
-        <p className="text-slate-500 mt-2">Register and manage did:ethr identifiers for companies.</p>
+          <h1 className="text-3xl font-bold text-slate-900">Company Registry</h1>
+          <p className="text-slate-500 mt-2">Lookup and manage decentralized identities.</p>
       </div>
 
-      {!isConnected && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center text-amber-800">
-          <ShieldAlert className="w-5 h-5 mr-3" />
-          <p className="text-sm font-medium">Please connect your wallet to manage companies.</p>
-        </div>
-      )}
-
-      <div className="max-w-3xl">
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center">
-             <Plus className="w-4 h-4 mr-2 text-indigo-500" />
-             Actions
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Search className="w-5 h-5 text-indigo-500" />
+              Identity Lookup
           </h3>
           
-          <div className="space-y-6">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
-                Search Company Address
-              </label>
+          <div className="relative">
               <input 
                 type="text" 
+                placeholder="0x... (Company DID Address)"
                 value={inputAddress}
                 onChange={(e) => setInputAddress(e.target.value)}
-                placeholder="0x..." 
-                disabled={isPending}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-sm disabled:bg-slate-50"
+                className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono text-sm transition-all"
               />
-            </div>
-
-            {/* AUTOMATIC STATUS DISPLAY */}
-            {checkAddress && (
-                <div className={`p-5 rounded-lg border transition-all duration-300 ${
-                    isChecking ? 'bg-slate-50 border-slate-100 opacity-70' :
-                    isManaged ? 'bg-green-50 border-green-200' :
-                    'bg-amber-50 border-amber-200'
-                }`}>
-                    {isChecking ? (
-                        <div className="flex items-center text-slate-500">
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            <span className="text-sm">Verifying on-chain status...</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-start gap-4">
-                            <div className={`p-2 rounded-full ${isManaged ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
-                                {isManaged ? <CheckCircle2 className="w-5 h-5"/> : <AlertTriangle className="w-5 h-5"/>}
-                            </div>
-                            <div>
-                                <h4 className={`text-sm font-bold ${isManaged ? 'text-green-800' : 'text-amber-800'}`}>
-                                    {isManaged ? 'Company is Managed' : 'Waiting for Delegation'}
-                                </h4>
-                                <p className="text-xs mt-1 text-slate-600">
-                                    {isManaged 
-                                        ? "This identity is correctly controlled by the Trust Anchor. You can propose governance actions."
-                                        : "The Company controls this identity. They must delegate control via the Company Portal first."
-                                    }
-                                </p>
-                                <div className="mt-2 text-[10px] text-slate-400 font-mono">
-                                    Current Owner: {currentOwner}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            <div className="pt-2 border-t border-slate-100"></div>
-
-            <button 
-              onClick={handleRegister}
-              disabled={!isConnected || !isReadyForProposal || isPending}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center shadow-sm"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing Proposal...
-                </>
-              ) : (
-                <>
-                  Propose Governance Action
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </>
-              )}
-            </button>
-
-            {isSuccess && (
-              <div className="flex items-center text-green-600 text-sm mt-2 p-3 bg-green-50 border border-green-100 rounded-lg animate-in fade-in slide-in-from-top-2">
-                <CheckCircle2 className="w-5 h-5 mr-2" />
-                Proposal successfully created on-chain.
-              </div>
-            )}
-
-            {error && (
-              <div className="text-red-600 text-xs mt-2 p-3 bg-red-50 border border-red-100 rounded-lg break-words animate-in fade-in slide-in-from-top-2">
-                <strong>Error:</strong> {error.message.split('.')[0]}
-              </div>
-            )}
+              <Building2 className="w-5 h-5 text-slate-400 absolute left-4 top-3.5" />
           </div>
-        </div>
 
-        {/* CRSet Admin Management */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center">
-            <UserPlus className="w-4 h-4 mr-2 text-emerald-500" />
-            Manage CRSet Admins
-          </h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
-                Company DID
-              </label>
-              <input 
-                type="text" 
-                value={adminCompanyDID}
-                onChange={(e) => setAdminCompanyDID(e.target.value)}
-                placeholder="0x..." 
-                disabled={isAdminPending}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm disabled:bg-slate-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
-                Admin Address
-              </label>
-              <input 
-                type="text" 
-                value={adminAddress}
-                onChange={(e) => setAdminAddress(e.target.value)}
-                placeholder="0x..." 
-                disabled={isAdminPending}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm disabled:bg-slate-50"
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button 
-                onClick={handleAddAdmin}
-                disabled={!isConnected || !adminCompanyDID || !adminAddress || isAdminPending}
-                className="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center shadow-sm"
-              >
-                {isAdminPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Admin
-                  </>
-                )}
-              </button>
-
-              <button 
-                onClick={handleRemoveAdmin}
-                disabled={!isConnected || !adminCompanyDID || !adminAddress || isAdminPending}
-                className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center shadow-sm"
-              >
-                {isAdminPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Remove Admin
-                  </>
-                )}
-              </button>
-            </div>
-
-            {isAdminSuccess && (
-              <div className="flex items-center text-green-600 text-sm p-3 bg-green-50 border border-green-100 rounded-lg animate-in fade-in slide-in-from-top-2">
-                <CheckCircle2 className="w-5 h-5 mr-2" />
-                Admin operation completed successfully.
-              </div>
-            )}
-
-            {adminError && (
-              <div className="text-red-600 text-xs p-3 bg-red-50 border border-red-100 rounded-lg break-words animate-in fade-in slide-in-from-top-2">
-                <strong>Error:</strong> {adminError.message.split('.')[0]}
-              </div>
-            )}
+          <div className="mt-6 border-t border-slate-100 pt-6">
+              {renderStatus()}
           </div>
-        </div>
-
-        {/* DID Sync Management */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center">
-            <RefreshCw className="w-4 h-4 mr-2 text-indigo-500" />
-            Sync Revocation CID to DID Document
-          </h3>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase mb-2">
-                Company DID
-              </label>
-              <input 
-                type="text" 
-                value={syncCompanyDID}
-                onChange={(e) => setSyncCompanyDID(e.target.value)}
-                placeholder="0x..." 
-                disabled={isSyncPending}
-                className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-sm disabled:bg-slate-50"
-              />
-            </div>
-
-            {syncCheckDID && (
-              <div className={`p-4 rounded-lg border ${
-                isLoadingCID ? 'bg-slate-50 border-slate-200' :
-                companyCID ? 'bg-green-50 border-green-200' :
-                'bg-amber-50 border-amber-200'
-              }`}>
-                {isLoadingCID ? (
-                  <div className="flex items-center text-slate-500">
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    <span className="text-sm">Checking registry...</span>
-                  </div>
-                ) : companyCID ? (
-                  <div>
-                    <p className="text-xs text-green-700 font-semibold uppercase mb-1">Current CID</p>
-                    <p className="text-sm text-green-900 font-mono break-all">{companyCID}</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center text-amber-700">
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    <span className="text-sm">No CID found for this company</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <button 
-              onClick={handleSyncCID}
-              disabled={!isConnected || !syncCheckDID || !companyCID || isSyncPending}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center shadow-sm"
-            >
-              {isSyncPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing to DID...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Sync to DID Document
-                </>
-              )}
-            </button>
-
-            {isSyncSuccess && (
-              <div className="flex items-center text-green-600 text-sm p-3 bg-green-50 border border-green-100 rounded-lg animate-in fade-in slide-in-from-top-2">
-                <CheckCircle2 className="w-5 h-5 mr-2" />
-                CID successfully synced to DID document!
-              </div>
-            )}
-
-            {syncError && (
-              <div className="text-red-600 text-xs p-3 bg-red-50 border border-red-100 rounded-lg break-words animate-in fade-in slide-in-from-top-2">
-                <strong>Error:</strong> {syncError.message.split('.')[0]}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
+
+      {/* Restored Advanced Tools */}
+      {renderAdvancedTools()}
     </div>
   )
 }

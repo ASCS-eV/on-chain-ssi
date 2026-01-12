@@ -1,17 +1,13 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Building2, ShieldCheck, LogOut, Settings } from 'lucide-react'
-import { useAccount, useDisconnect, useConnect } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { LayoutDashboard, Building2, ShieldCheck, Settings } from 'lucide-react'
+import { UserBadge } from '../ui/UserBadge'
 
 interface TrustAnchorLayoutProps {
   children: ReactNode
 }
 
 export function TrustAnchorLayout({ children }: TrustAnchorLayoutProps) {
-  const { address, isConnected } = useAccount()
-  const { disconnect } = useDisconnect()
-  const { connect } = useConnect()
   const location = useLocation()
 
   const navItems = [
@@ -20,20 +16,19 @@ export function TrustAnchorLayout({ children }: TrustAnchorLayoutProps) {
     { label: 'Governance', path: '/trust-anchor/governance', icon: Settings },
   ]
 
-  const shortAddress = address 
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : ''
-
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
       
-      {/* TA SIDEBAR */}
+      {/* TA SIDEBAR (Dark Theme) */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col fixed h-full shadow-xl z-10">
+        
+        {/* Header */}
         <div className="h-16 flex items-center px-6 border-b border-slate-800">
           <ShieldCheck className="w-6 h-6 text-indigo-400 mr-2" />
           <span className="font-bold text-lg tracking-wide">Trust Anchor</span>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 py-6 px-3 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path
@@ -54,30 +49,8 @@ export function TrustAnchorLayout({ children }: TrustAnchorLayoutProps) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-950">
-          {isConnected ? (
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-xs text-slate-500 uppercase font-semibold">Admin Wallet</span>
-                <span className="text-sm font-mono text-slate-300">{shortAddress}</span>
-              </div>
-              <button 
-                onClick={() => disconnect()}
-                className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-red-400"
-                title="Disconnect"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => connect({ connector: injected() })}
-              className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors"
-            >
-              Connect Wallet
-            </button>
-          )}
-        </div>
+        {/* User Profile Section - Integrated UserBadge */}
+        <UserBadge />
       </aside>
 
       {/* MAIN CONTENT AREA */}
