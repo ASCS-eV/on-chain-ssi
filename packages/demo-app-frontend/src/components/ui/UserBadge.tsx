@@ -3,7 +3,12 @@ import { useDisconnect } from 'wagmi'
 import { useIdentity } from '../../hooks/useIdentity'
 import { useState } from 'react'
 
-export function UserBadge() {
+// Add props interface
+interface UserBadgeProps {
+    isCollapsed?: boolean
+}
+
+export function UserBadge({ isCollapsed = false }: UserBadgeProps) {
   const { disconnect } = useDisconnect()
   const { role, shortAddress, roleLabel, address } = useIdentity()
   const [copied, setCopied] = useState(false)
@@ -16,7 +21,6 @@ export function UserBadge() {
     }
   }
 
-  // Generate a deterministic gradient based on address for "Avatar" look
   const avatarGradient = address 
     ? `linear-gradient(135deg, #${address.slice(2, 8)} 0%, #${address.slice(address.length - 6)} 100%)`
     : 'bg-slate-700'
@@ -25,10 +29,30 @@ export function UserBadge() {
     ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' 
     : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
 
+  // COMPACT MODE (Collapsed)
+  if (isCollapsed) {
+      return (
+          <div className="p-4 border-t border-slate-800 bg-slate-950/50 flex flex-col items-center gap-4">
+              <div 
+                className="w-8 h-8 rounded-full shadow-inner ring-1 ring-slate-700"
+                style={{ background: avatarGradient }}
+                title={roleLabel}
+              />
+              <button 
+                onClick={() => disconnect()}
+                className="text-slate-500 hover:text-red-400 transition-colors"
+                title="Disconnect"
+              >
+                  <LogOut className="w-5 h-5" />
+              </button>
+          </div>
+      )
+  }
+
+  // FULL MODE
   return (
     <div className="p-4 border-t border-slate-800 bg-slate-950/50">
       <div className="flex items-center gap-3 mb-3">
-        {/* Avatar */}
         <div 
           className="w-10 h-10 rounded-full shadow-inner ring-2 ring-slate-800"
           style={{ background: avatarGradient }}

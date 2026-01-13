@@ -3,6 +3,7 @@ import { WagmiProvider, useChainId, useSwitchChain } from 'wagmi'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { config } from './lib/wagmi'
 import { Toaster } from 'sonner'
+import { Navigate } from 'react-router-dom'
 import { TrustAnchorLayout } from './components/layout/TrustAnchorLayout'
 import { CompanyLayout } from './components/layout/CompanyLayout'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -57,9 +58,10 @@ function App() {
               <ProtectedRoute requiredRole="admin">
                 <TrustAnchorLayout>
                   <Routes>
-                    <Route path="/" element={<TrustAnchorDashboard />} />
-                    <Route path="/companies" element={<CompaniesPage />} />
-                    <Route path="/governance" element={<GovernancePage />} />
+                    <Route path="/" element={<Navigate to="overview" replace />} />
+                    <Route path="overview" element={<TrustAnchorDashboard />} />
+                    <Route path="companies" element={<CompaniesPage />} />
+                    <Route path="governance" element={<GovernancePage />} />
                   </Routes>
                 </TrustAnchorLayout>
               </ProtectedRoute>
