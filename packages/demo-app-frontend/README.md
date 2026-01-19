@@ -86,8 +86,8 @@ The application supports two distinct user roles. Use MetaMask to switch between
 * Go to **Companies**.
 * Search for a company's DID address (Wallet Address).
 * If the company is "Not Managed", wait for them to delegate control.
-* If they have delegated, click **"Register Company"** to create a governance proposal.
-* **Admin Tools:** Use the "CRSet Admins" panel to add the company's wallet as an admin for their specific CRSet.
+* If they have delegated (Yellow status), scroll down to **"CRSet Admins"**.
+* Paste the company's address and click **Add**. This completes the registration immediately (no proposal required).
 
 
 3. **Governance:**

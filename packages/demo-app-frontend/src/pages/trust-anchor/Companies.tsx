@@ -1,15 +1,13 @@
-import { Plus, Loader2, CheckCircle2, AlertTriangle, Search, Building2, UserPlus, UserMinus, RefreshCw } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertTriangle, Search, Building2, UserPlus, UserMinus, RefreshCw, Clock } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useAccount, useReadContract } from 'wagmi'
-import { useGovernance } from '../../hooks/useGovernance'
+import { useReadContract } from 'wagmi'
 import { useCRSetManagement } from '../../hooks/useCRSetManagement'
 import { useDIDSync, useReadCID } from '../../hooks/useDIDSync'
-import { REGISTRY_ADDRESS, REGISTRY_ABI, TRUST_ANCHOR_ADDRESS } from '../../lib/contracts'
+import { REGISTRY_ADDRESS, REGISTRY_ABI, TRUST_ANCHOR_ADDRESS, CRSET_REGISTRY_ADDRESS, CRSET_REGISTRY_ABI } from '../../lib/contracts'
 import { isAddress } from 'viem'
 import { toast } from 'sonner'
 
 export function CompaniesPage() {
-  const { isConnected } = useAccount()
   const [inputAddress, setInputAddress] = useState('')
   const [debouncedAddress, setDebouncedAddress] = useState<`0x${string}` | undefined>(undefined)
   
@@ -17,7 +15,6 @@ export function CompaniesPage() {
   const [adminAddress, setAdminAddress] = useState('')
 
   // Hooks
-  const { proposeCompanyRegistration, isPending } = useGovernance()
   const { addCompanyAdmin, removeCompanyAdmin, isPending: isAdminPending, isSuccess: isAdminSuccess } = useCRSetManagement()
   const { syncCIDToDID, isPending: isSyncPending, isSuccess: isSyncSuccess } = useDIDSync()
   const { cid: companyCID, isLoading: isCIDLoading } = useReadCID(debouncedAddress)
@@ -34,14 +31,14 @@ export function CompaniesPage() {
     return () => clearTimeout(timer)
   }, [inputAddress])
 
-  // Notifications for side-effects
+  // Notifications
   useEffect(() => {
       if (isAdminSuccess) toast.success("Admin Updated Successfully")
       if (isSyncSuccess) toast.success("DID Document Synced Successfully")
   }, [isAdminSuccess, isSyncSuccess])
 
-  // READ Status
-  const { data: currentOwner, isLoading: isChecking } = useReadContract({
+  // 1. READ: Identity Owner
+  const { data: currentOwner, isLoading: isCheckingOwner } = useReadContract({
     address: REGISTRY_ADDRESS,
     abi: REGISTRY_ABI,
     functionName: 'identityOwner',
@@ -49,14 +46,26 @@ export function CompaniesPage() {
     query: { enabled: !!debouncedAddress }
   })
 
-  // Determine Status
+  // 2. READ: Is Already Admin (Registered)
+  const { data: isRegisteredAdmin, isLoading: isCheckingAdmin } = useReadContract({
+      address: CRSET_REGISTRY_ADDRESS,
+      abi: CRSET_REGISTRY_ABI,
+      functionName: 'isCompanyAdmin',
+      args: debouncedAddress ? [debouncedAddress, debouncedAddress] : undefined, // Check if company is admin of itself
+      query: { enabled: !!debouncedAddress }
+  })
+
+  const isLoading = isCheckingOwner || isCheckingAdmin
+
+  // --- LOGIC: 3 STATES ---
   const isManaged = currentOwner && TRUST_ANCHOR_ADDRESS && 
     currentOwner.toLowerCase() === TRUST_ANCHOR_ADDRESS.toLowerCase()
 
-  const handleRegister = () => {
-    if (!debouncedAddress) return
-    proposeCompanyRegistration(debouncedAddress)
-  }
+  // State 1: Unmanaged (Needs Delegation)
+  const isUnmanaged = !isManaged
+
+  // State 2: Delegated but NOT Registered (Needs Action from TA)
+  const isPendingRegistration = isManaged && !isRegisteredAdmin
 
   // Admin Handlers
   const handleAddAdmin = () => {
@@ -91,66 +100,81 @@ export function CompaniesPage() {
           </div>
       )
 
-      if (isChecking) return (
+      if (isLoading) return (
           <div className="text-center py-12 text-slate-500">
               <Loader2 className="w-10 h-10 mx-auto mb-3 animate-spin text-indigo-500" />
               <p>Verifying Identity Status...</p>
           </div>
       )
 
-      return (
-          <div className="animate-in fade-in slide-in-from-bottom-2">
-              <div className={`p-6 rounded-xl border-2 ${
-                  isManaged ? 'border-green-200 bg-green-50/50' : 'border-amber-200 bg-amber-50/50'
-              }`}>
-                  <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-full ${
-                          isManaged ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
-                      }`}>
-                          {isManaged ? <CheckCircle2 className="w-6 h-6"/> : <AlertTriangle className="w-6 h-6"/>}
-                      </div>
-                      <div className="flex-1">
-                          <h4 className="text-lg font-bold text-slate-900">
-                              {isManaged ? 'Identity is Managed' : 'Action Required'}
-                          </h4>
-                          <p className="text-slate-600 mt-1">
-                              {isManaged 
-                                  ? "This identity is correctly delegated to the Trust Anchor." 
-                                  : "This identity is NOT controlled by the Trust Anchor."}
-                          </p>
-                          
-                          {!isManaged && (
-                             <div className="mt-4 bg-white p-4 rounded-lg border border-amber-200 text-sm text-slate-600">
-                                 <strong>Next Step:</strong> The company must delegate control using their wallet via the Company Onboarding portal.
-                             </div>
-                          )}
-                      </div>
-                  </div>
-              </div>
+      // STATE 1: Unmanaged (Red)
+      if (isUnmanaged) {
+          return (
+            <div className="animate-in fade-in slide-in-from-bottom-2">
+                <div className="p-6 rounded-xl border-2 border-red-200 bg-red-50/50">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-full bg-red-100 text-red-600">
+                            <AlertTriangle className="w-6 h-6"/>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-lg font-bold text-slate-900">Action Required: Delegation</h4>
+                           <p className="text-slate-600 mt-1">
+                                This identity is NOT controlled by the Trust Anchor. The company must delegate control first via the Onboarding page.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          )
+      }
 
-              {isManaged && (
-                  <div className="mt-6">
-                      <button 
-                        onClick={handleRegister}
-                        disabled={isPending || !isConnected}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
-                      >
-                        {isPending ? (
-                            <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Creating Proposal...</>
-                        ) : (
-                            <><Plus className="w-5 h-5 mr-2" /> Register Company (Create Proposal)</>
-                        )}
-                      </button>
-                      <p className="text-xs text-center text-slate-400 mt-3">
-                          This will create a governance proposal to officialy register the company.
-                      </p>
-                  </div>
-              )}
-          </div>
+      // STATE 2: Pending Registration (Yellow)
+      if (isPendingRegistration) {
+          return (
+            <div className="animate-in fade-in slide-in-from-bottom-2">
+                <div className="p-6 rounded-xl border-2 border-amber-300 bg-amber-50">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-full bg-amber-100 text-amber-700">
+                            <Clock className="w-6 h-6"/>
+                        </div>
+                        <div className="flex-1">
+                        <h4 className="text-lg font-bold text-slate-900">Identity Managed (Step 1 Complete)</h4>
+                            <p className="text-slate-700 mt-1 text-sm">
+                                The Trust Anchor owns this identity, but the company wallet has no write access yet.
+                            </p>
+                            <div className="mt-4 p-3 bg-white/80 rounded border border-amber-200 text-amber-800 text-sm font-medium flex items-center gap-2">
+                                <UserPlus className="w-4 h-4" />
+                                Action Required: Add this address to "CRSet Admins" below.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          )
+      }
+
+      // STATE 3: Fully Registered (Green)
+      return (
+        <div className="animate-in fade-in slide-in-from-bottom-2">
+            <div className="p-6 rounded-xl border-2 border-green-200 bg-green-50/50">
+                <div className="flex items-start gap-4">
+                    <div className="p-3 rounded-full bg-green-100 text-green-600">
+                        <CheckCircle2 className="w-6 h-6"/>
+                    </div>
+                    <div className="flex-1">
+                        <h4 className="text-lg font-bold text-slate-900">Fully Verified</h4>
+                        <p className="text-slate-600 mt-1">
+                            Identity is managed and the company has full admin access to their CRSet.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {/* No Register Button here - it's already done */}
+        </div>
       )
   }
 
-  // --- RESTORED FUNCTIONALITY ---
+  // ... (Advanced Tools render remains the same)
   const renderAdvancedTools = () => {
       if (!isManaged || !debouncedAddress) return null;
 
@@ -250,7 +274,7 @@ export function CompaniesPage() {
           </div>
       </div>
 
-      {/* Restored Advanced Tools */}
+      {/* Advanced Tools */}
       {renderAdvancedTools()}
     </div>
   )
