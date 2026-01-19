@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
 import { CRSET_REGISTRY_ADDRESS, CRSET_REGISTRY_ABI } from '../../lib/contracts'
-import { Upload, Loader2, CheckCircle2, AlertCircle, FileJson, X, History, ExternalLink } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, FileJson, X, History, ExternalLink } from 'lucide-react'
 import { uploadToIPFS } from '../../lib/ipfs'
 import { toast } from 'sonner'
 
@@ -14,7 +14,7 @@ export function RevocationListPage() {
   const [isUploading, setIsUploading] = useState(false)
   
   // Read Current CID
-  const { data: currentCID, isLoading: isReadingCID, refetch } = useReadContract({
+  const { data: currentCID, isLoading: isReadingCID } = useReadContract({
     address: CRSET_REGISTRY_ADDRESS,
     abi: CRSET_REGISTRY_ABI,
     functionName: 'getRevocationCID',

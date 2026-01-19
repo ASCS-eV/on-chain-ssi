@@ -1,73 +1,125 @@
-# React + TypeScript + Vite
+# Etherlink SSI Governance Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The client-side application for the Etherlink SSI Governance Platform. This dashboard provides two distinct portals: one for the **Trust Anchor** (Governance & Administration) and one for **Companies** (Identity Onboarding & Revocation Management).
 
-Currently, two official plugins are available:
+## 📋 Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Before running the frontend, ensure the following requirements are met:
 
-## React Compiler
+1. **Local Blockchain Node:** A Hardhat node must be running.
+2. **Deployed Contracts:** The `CompanyCRSet` module must be deployed to the local network.
+3. **Environment Variables:** Create a `.env` file in this directory with your contract addresses and Pinata keys.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+cp .env.example .env
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+**Required Variables:**
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```env
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+VITE_TRUST_ANCHOR_ADDRESS=0x...
+VITE_REGISTRY_ADDRESS=0x...
+VITE_CRSET_REGISTRY_ADDRESS=0x...
+VITE_PINATA_JWT=your_pinata_jwt_token
+
 ```
+
+---
+
+## 🐳 Docker Setup (Recommended)
+
+You can containerize this application using the included Dockerfile (Nginx + Alpine).
+
+### 1. Build the Image
+
+*Note: The build process bakes the `.env` variables into the static files. Ensure your `.env` file is correct before building.*
+
+```bash
+docker build -t ssi-frontend .
+
+```
+
+### 2. Run the Container
+
+Map port 80 of the container to port 8080 on your host.
+
+```bash
+docker run -d -p 8080:80 --name ssi-app ssi-frontend
+
+```
+
+Access the application at: **[http://localhost:8080](https://www.google.com/search?q=http://localhost:8080)**
+
+---
+
+## 💻 Local Development
+
+To run the application in development mode with Hot Module Replacement (HMR):
+
+```bash
+# Install dependencies
+npm install
+
+# Start Dev Server
+npm run dev
+
+```
+
+---
+
+## 📖 Usage Guide
+
+The application supports two distinct user roles. Use MetaMask to switch between wallets to simulate these roles.
+
+### 🏛️ Role 1: Trust Anchor (Administrator)
+
+*Use the wallet address that deployed the contracts (Account #0).*
+
+1. **Dashboard Overview:**
+* Navigate to `/trust-anchor`.
+* View real-time governance stats, quorum thresholds, and active proposals.
+
+
+2. **Registering Companies:**
+* Go to **Companies**.
+* Search for a company's DID address (Wallet Address).
+* If the company is "Not Managed", wait for them to delegate control.
+* If they have delegated, click **"Register Company"** to create a governance proposal.
+* **Admin Tools:** Use the "CRSet Admins" panel to add the company's wallet as an admin for their specific CRSet.
+
+
+3. **Governance:**
+* Go to **Governance**.
+* Propose adding/removing admins or updating the multi-sig quorum threshold.
+
+
+
+### 🏢 Role 2: Company (User)
+
+*Use any other wallet address (Account #1, #2, etc.).*
+
+1. **Onboarding:**
+* Navigate to `/company/onboarding`.
+* **Step 1 (Delegate):** Sign the transaction to transfer identity ownership to the Trust Anchor.
+* **Step 2 (Verification):** Wait for the Trust Anchor to approve your registration and add you as a CRSet Admin.
+* **Step 3 (Complete):** Once verified, the dashboard will unlock.
+
+
+2. **Revocation Management:**
+* Navigate to `/company/revocations`.
+* **Upload:** Drag & Drop a W3C-compliant JSON revocation list.
+* **Publish:** The app uploads the file to IPFS (via Pinata) and updates the smart contract with the new CID.
+
+
+
+---
+
+## 🛠 Tech Stack
+
+* **Framework:** React + Vite
+* **Language:** TypeScript
+* **Web3 Integration:** Wagmi v2, Viem, TanStack Query
+* **Styling:** Tailwind CSS, Lucide Icons
+* **Deployment:** Docker, Nginx
