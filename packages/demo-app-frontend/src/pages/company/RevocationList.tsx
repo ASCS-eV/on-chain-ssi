@@ -1,258 +1,223 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
 import { CRSET_REGISTRY_ADDRESS, CRSET_REGISTRY_ABI } from '../../lib/contracts'
-import { Upload, Loader2, CheckCircle2, AlertCircle, List } from 'lucide-react'
+import { Upload, Loader2, CheckCircle2, FileJson, X, History, ExternalLink } from 'lucide-react'
 import { uploadToIPFS } from '../../lib/ipfs'
+import { toast } from 'sonner'
 
 export function RevocationListPage() {
   const { address } = useAccount()
-  const [companyDID, setCompanyDID] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [ipfsCID, setIpfsCID] = useState<string>('')
+  const [fileContent, setFileContent] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string>('')
-
-  // We use companyDID if provided, otherwise use connected address
-  const targetCompany = (companyDID && companyDID.startsWith('0x') && companyDID.length === 42) 
-    ? companyDID as `0x${string}` 
-    : address
-
-  // Read the current CID from contract
-  const { data: currentCID, refetch } = useReadContract({
+  
+  // Read Current CID
+  const { data: currentCID, isLoading: isReadingCID } = useReadContract({
     address: CRSET_REGISTRY_ADDRESS,
     abi: CRSET_REGISTRY_ABI,
     functionName: 'getRevocationCID',
-    args: targetCompany ? [targetCompany] : undefined,
+    args: address ? [address] : undefined,
+    query: { enabled: !!address }
   })
 
-  // Check if current user is authorized admin
-  const { data: isAuthorized } = useReadContract({
-    address: CRSET_REGISTRY_ADDRESS,
-    abi: CRSET_REGISTRY_ABI,
-    functionName: 'isCompanyAdmin',
-    args: (targetCompany && address) ? [targetCompany, address] : undefined,
-  })
-
-  // Write contract hook to update CID
-  const { writeContract, data: hash, isPending, error: txError } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ 
-    hash
-  })
-
-  // Refetch and reset on success
-  useEffect(() => {
-    if (isSuccess && hash) {
-      refetch()
-      setIpfsCID('')
-      setSelectedFile(null)
-    }
-  }, [isSuccess, hash, refetch])
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (file.type !== 'application/json') {
-        setUploadError('Please select a JSON file')
-        return
+  // Write Contract
+  const { writeContract, data: hash, isPending } = useWriteContract({
+      mutation: {
+          onError: (err) => toast.error("Transaction Failed", { description: err.message.split('\n')[0] })
       }
-      setSelectedFile(file)
-      setUploadError('')
+  })
+  
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+
+  // Handle File Selection
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.type !== 'application/json') {
+      toast.error("Invalid File", { description: "Please upload a .json file" })
+      return
+    }
+
+    // Client-side validation
+    const text = await file.text()
+    try {
+        JSON.parse(text) // Validate JSON syntax
+        setSelectedFile(file)
+        setFileContent(text)
+    } catch (e) {
+        toast.error("Invalid JSON", { description: "File content is not valid JSON" })
     }
   }
 
-  const handleUploadToIPFS = async () => {
-    if (!selectedFile) return
+  const clearFile = () => {
+      setSelectedFile(null)
+      setFileContent(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handlePublish = async () => {
+    if (!selectedFile || !address) return
 
     setIsUploading(true)
-    setUploadError('')
-
     try {
-      const cid = await uploadToIPFS(selectedFile)
-      setIpfsCID(cid)
+        // 1. Upload to IPFS
+        const cid = await uploadToIPFS(selectedFile)
+        setIsUploading(false)
+        
+        // 2. Update Contract
+        toast.info("IPFS Uploaded", { description: `CID: ${cid}. Confirming on-chain...` })
+        
+        writeContract({
+            address: CRSET_REGISTRY_ADDRESS,
+            abi: CRSET_REGISTRY_ABI,
+            functionName: 'updateRevocationCID',
+            args: [address, cid],
+        })
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Failed to upload to IPFS')
-    } finally {
-      setIsUploading(false)
+        setIsUploading(false)
+        toast.error("Upload Failed", { description: "Failed to upload to IPFS" })
     }
   }
 
-  const handleUpdateCID = () => {
-    if (!targetCompany || !ipfsCID) return
+  // --- UI COMPONENTS ---
 
-    writeContract({
-      address: CRSET_REGISTRY_ADDRESS,
-      abi: CRSET_REGISTRY_ABI,
-      functionName: 'updateRevocationCID',
-      args: [targetCompany, ipfsCID],
-    })
-  }
+  const StatusCard = () => (
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
+          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <History className="w-5 h-5 text-indigo-500" />
+              Current Version
+          </h3>
+          
+          <div className="flex-1 flex flex-col justify-center">
+              {isReadingCID ? (
+                  <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                      <div className="h-12 bg-slate-100 rounded"></div>
+                  </div>
+              ) : currentCID ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 break-all">
+                      <p className="text-xs text-slate-500 uppercase font-bold mb-1">Active IPFS CID</p>
+                      <p className="font-mono text-sm text-slate-800">{currentCID}</p>
+                      
+                      <div className="mt-4 pt-4 border-t border-slate-200 flex gap-3">
+                          <a 
+                            href={`https://ipfs.io/ipfs/${currentCID}`} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-xs flex items-center text-indigo-600 hover:text-indigo-700 font-medium"
+                          >
+                              <ExternalLink className="w-3 h-3 mr-1" /> View Raw Data
+                          </a>
+                          <span className="text-xs flex items-center text-green-600 font-medium">
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> Synced
+                          </span>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="text-center text-slate-400 py-8">
+                      <FileJson className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">No revocation list published.</p>
+                  </div>
+              )}
+          </div>
+      </div>
+  )
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Credential Revocation List</h1>
-        <p className="text-slate-500 mt-2">Manage your company's revoked credentials.</p>
+        <h1 className="text-3xl font-bold text-slate-900">Revocation Management</h1>
+        <p className="text-slate-500 mt-2">Publish updated Credential Revocation Lists (CRL) to IPFS and Etherlink.</p>
       </div>
 
-      {/* Company DID Selection */}
-      <div className="bg-slate-50 border border-slate-200 p-6 rounded-xl">
-        <label className="block text-sm font-semibold text-slate-700 mb-2">
-          Company DID Address
-        </label>
-        <input
-          type="text"
-          value={companyDID}
-          onChange={(e) => setCompanyDID(e.target.value)}
-          placeholder="0x... (leave empty to use your own address)"
-          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono text-sm"
-        />
-        <p className="text-xs text-slate-500 mt-2">
-          {targetCompany ? (
-            <>Managing revocation list for: <span className="font-mono font-semibold">{targetCompany}</span></>
-          ) : (
-            'Enter a company DID address, or leave empty to manage your own'
-          )}
-        </p>
-      </div>
-
-      {/* Current CID Display */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center">
-          <List className="w-5 h-5 mr-2 text-emerald-600" />
-          Current Revocation List
-        </h3>
-        {currentCID ? (
-          <div className="bg-slate-50 p-4 rounded-lg">
-            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">IPFS CID</p>
-            <p className="font-mono text-sm text-slate-900 break-all">{currentCID}</p>
-            <a 
-              href={`https://ipfs.io/ipfs/${currentCID}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-emerald-600 hover:text-emerald-700 mt-2 inline-block"
-            >
-              View on IPFS →
-            </a>
-          </div>
-        ) : (
-          <p className="text-slate-500 text-sm">No revocation list published yet.</p>
-        )}
-      </div>
-
-      {/* Upload New Revocation List */}
-      <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-          <Upload className="w-5 h-5 mr-2 text-emerald-600" />
-          Update Revocation List
-        </h3>
-
-        <div className="space-y-4">
-          {/* first we upload to IPFS */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">
-              Step 1: Select JSON file
-            </label>
-            <input
-              type="file"
-              accept="application/json"
-              onChange={handleFileSelect}
-              className="block w-full text-sm text-slate-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-lg file:border-0
-                file:text-sm file:font-semibold
-                file:bg-emerald-50 file:text-emerald-700
-                hover:file:bg-emerald-100
-                cursor-pointer"
-            />
-            {selectedFile && (
-              <p className="text-xs text-slate-500">Selected: {selectedFile.name}</p>
-            )}
-          </div>
-
-          {uploadError && (
-            <div className="p-3 bg-red-50 text-red-600 rounded-lg flex items-start text-sm">
-              <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-              <span>{uploadError}</span>
-            </div>
-          )}
-
-          <button
-            onClick={handleUploadToIPFS}
-            disabled={!selectedFile || isUploading}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Uploading to IPFS...
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Upload to IPFS
-              </>
-            )}
-          </button>
-
-          {/*then we update companyCrset contract */}
-          {ipfsCID && (
-            <div className="pt-4 border-t border-slate-200 space-y-3">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-green-900 mb-1">✓ Uploaded to IPFS</p>
-                <p className="text-xs text-green-700 font-mono break-all">{ipfsCID}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* LEFT: UPLOAD ZONE (2 Cols) */}
+          <div className="lg:col-span-2 space-y-6">
+              <div 
+                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
+                    selectedFile 
+                        ? 'border-indigo-300 bg-indigo-50/30' 
+                        : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50'
+                }`}
+              >
+                  {!selectedFile ? (
+                      <div className="flex flex-col items-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                          <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-4">
+                              <Upload className="w-8 h-8" />
+                          </div>
+                          <h3 className="font-bold text-slate-900 text-lg">Upload JSON List</h3>
+                          <p className="text-slate-500 mt-1 max-w-sm">
+                              Drag and drop or click to upload your W3C Verifiable Credential revocation list.
+                          </p>
+                          <input 
+                            ref={fileInputRef}
+                            type="file" 
+                            accept="application/json" 
+                            className="hidden" 
+                            onChange={handleFileSelect}
+                          />
+                      </div>
+                  ) : (
+                      <div className="flex flex-col items-center">
+                          <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-4">
+                              <FileJson className="w-8 h-8" />
+                          </div>
+                          <h3 className="font-bold text-slate-900 text-lg break-all px-4">{selectedFile.name}</h3>
+                          <p className="text-slate-500 text-sm mt-1">
+                              {(selectedFile.size / 1024).toFixed(2)} KB • Ready to publish
+                          </p>
+                          
+                          <button 
+                            onClick={clearFile}
+                            className="mt-4 text-sm text-red-500 hover:text-red-600 flex items-center font-medium"
+                          >
+                              <X className="w-4 h-4 mr-1" /> Remove File
+                          </button>
+                      </div>
+                  )}
               </div>
 
-              <label className="block text-sm font-medium text-slate-700">
-                Step 2: Update on-chain registry
-              </label>
-
-              {!isAuthorized && (
-                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-start text-sm">
-                  <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold mb-1">Authorization Required</p>
-                    <p>You need to be designated as an admin by the Trust Anchor before you can update the revocation list.</p>
+              {/* PREVIEW & ACTION */}
+              {selectedFile && (
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2">
+                      <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                          <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Preview</h4>
+                          <span className="text-xs text-slate-400 font-mono">JSON</span>
+                      </div>
+                      <pre className="p-4 bg-slate-900 text-slate-300 text-xs font-mono overflow-auto max-h-64">
+                          {fileContent}
+                      </pre>
+                      <div className="p-4 bg-white border-t border-slate-200">
+                          <button
+                            onClick={handlePublish}
+                            disabled={isUploading || isPending || isConfirming}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
+                          >
+                              {isUploading ? (
+                                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Uploading to IPFS...</>
+                              ) : isPending || isConfirming ? (
+                                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Confirming Transaction...</>
+                              ) : (
+                                  <><Upload className="w-5 h-5 mr-2" /> Publish Revocation List</>
+                              )}
+                          </button>
+                          {isSuccess && (
+                             <p className="text-center text-green-600 text-sm mt-3 font-medium animate-in fade-in">
+                                 ✓ Successfully published!
+                             </p>
+                          )}
+                      </div>
                   </div>
-                </div>
               )}
+          </div>
 
-              {txError && (
-                <div className="p-3 bg-red-50 text-red-600 rounded-lg flex items-start text-sm">
-                  <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                  <span>{txError.message.split('\n')[0]}</span>
-                </div>
-              )}
-
-              {isSuccess && (
-                <div className="flex items-center p-4 bg-green-50 text-green-700 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5 mr-3" />
-                  <div>
-                    <p className="font-medium">Revocation list updated!</p>
-                    <p className="text-sm">The new CID has been registered on-chain.</p>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={handleUpdateCID}
-                disabled={!isAuthorized || isPending || isConfirming}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isPending || isConfirming ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Update Registry
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
+          {/* RIGHT: CURRENT STATUS (1 Col) */}
+          <div className="lg:col-span-1">
+              <StatusCard />
+          </div>
       </div>
     </div>
   )

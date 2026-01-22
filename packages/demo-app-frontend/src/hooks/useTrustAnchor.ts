@@ -136,13 +136,21 @@ export function useTrustAnchorData() {
   // but for now history fetch on mount covers most cases.
 
   // 3. Existing Reads
-  const { data: quorum, isLoading: isQuorumLoading } = useReadContract({
+  const {
+    data: quorum,
+    isLoading: isQuorumLoading,
+    isError: isQuorumError,
+  } = useReadContract({
     address: TRUST_ANCHOR_ADDRESS,
     abi: TRUST_ANCHOR_ABI,
     functionName: "quorum",
   });
 
-  const { data: ownersData, isLoading: isOwnersLoading } = useReadContracts({
+  const {
+    data: ownersData,
+    isLoading: isOwnersLoading,
+    isError: isOwnersError,
+  } = useReadContracts({
     contracts: [
       {
         address: TRUST_ANCHOR_ADDRESS,
@@ -190,5 +198,6 @@ export function useTrustAnchorData() {
     approvals,
     totalAdmins: owners.length,
     isLoading: isQuorumLoading || isOwnersLoading,
+    isError: isQuorumError || isOwnersError,
   };
 }
