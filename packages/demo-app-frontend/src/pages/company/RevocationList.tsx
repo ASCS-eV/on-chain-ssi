@@ -130,7 +130,7 @@ export function RevocationListPage() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Revocation Management</h1>
-        <p className="text-slate-500 mt-2">Publish updated Credential Revocation Lists (CRL) to IPFS and Etherlink.</p>
+        <p className="text-slate-500 mt-2">Publish updated Credential Revocation Lists (CRL) to IPFS and the blockchain.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
