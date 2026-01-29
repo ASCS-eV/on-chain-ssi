@@ -9,6 +9,10 @@ interface IEthereumDIDRegistry {
     function revokeAttribute(address identity, bytes32 name, bytes calldata value) external;
 }
 
+interface IDigitalAssetMarketplaceStub {
+    function publishData(string calldata data) external;
+}
+
 contract DIDMultisigController {
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
@@ -107,6 +111,18 @@ contract DIDMultisigController {
 
         (bool success, ) = target.call(data);
         require(success, "call_failed");
+    }
+
+    /**
+    * @notice Publish data to a DigitalAssetMarketplaceStub owned by this multisig.
+    * @dev Speed-layer function: callable by any Trust Anchor admin.
+    *      Assumes this multisig contract is the owner of the marketplace contract.
+    */
+    function publishMarketplaceData(
+        address marketplace,
+        string calldata data
+    ) external onlyOwner {
+        IDigitalAssetMarketplaceStub(marketplace).publishData(data);
     }
 
     /*//////////////////////////////////////////////////////////////
