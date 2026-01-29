@@ -5,7 +5,7 @@ import { network } from "hardhat";
 describe("DigitalAssetMarketplaceStub", async function () {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
-  const [owner, nonOwner] = await viem.getWalletClients();
+  const [owner, nonOwner, assetOwner] = await viem.getWalletClients();
 
   let marketplace: any;
 
@@ -28,14 +28,16 @@ describe("DigitalAssetMarketplaceStub", async function () {
    * publishData
    */
 
-  it("Owner can publish data", async () => {
+  it("Owner can publish data and assign asset owner", async () => {
     const testData = "QmTestData";
+    const expectedAssetId = 0n;
 
     await marketplace.write.publishData(
-      [testData],
+      [testData, assetOwner.account.address],
       { account: owner.account }
     );
 
+    // Check DataPublished event
     const events = await publicClient.getContractEvents({
       address: marketplace.address,
       abi: marketplace.abi,
@@ -44,12 +46,21 @@ describe("DigitalAssetMarketplaceStub", async function () {
 
     const event = events.find((e: any) => e.args.data === testData);
     assert.ok(event, "DataPublished event should be emitted");
+
+    // Check asset ownership was recorded
+    const recordedOwner = await marketplace.read.assetOwners([
+      expectedAssetId
+    ]);
+    assert.equal(
+      recordedOwner.toLowerCase(),
+      assetOwner.account.address.toLowerCase()
+    );
   });
 
   it("Non-owner cannot publish data", async () => {
     await assert.rejects(
       marketplace.write.publishData(
-        ["UnauthorizedData"],
+        ["UnauthorizedData", assetOwner.account.address],
         { account: nonOwner.account }
       ),
       /Not the owner/

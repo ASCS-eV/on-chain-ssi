@@ -7,8 +7,9 @@ contract DigitalAssetMarketplaceStub  {
     address public owner;
 
     // digital assets on marketplace
-    mapping(uint256 => string) digitalAssets;
+    mapping(uint256 => string) digitalAssets; // stores digital assets by ID
     uint256 assetCount;
+    mapping(uint256 => address) public assetOwners; // stores owners of digital assets
 
     // modifier to restrict access to owner only
     modifier onlyOwner() {
@@ -26,9 +27,10 @@ contract DigitalAssetMarketplaceStub  {
     }
 
     // publish data as digital asset on marketplace
-    function publishData(string calldata data) external onlyOwner {
-        // add data as digital asset to marketplace
+    function publishData(string calldata data, address assetOwner) external onlyOwner {
+        // add data as digital asset to marketplace and register it to its owner
         digitalAssets[assetCount] = data;
+        assetOwners[assetCount] = assetOwner;
         assetCount++;
         emit DataPublished(data);
     }
