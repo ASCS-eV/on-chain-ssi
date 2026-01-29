@@ -55,15 +55,11 @@ export function CompaniesPage() {
           return
         }
         
-        // Get current block and query last 10000 blocks (avoid RPC limits)
-        const currentBlock = await publicClient.getBlockNumber()
-        const fromBlock = currentBlock > 10000n ? currentBlock - 10000n : 0n
-        
         const logs = await publicClient.getLogs({
           address: REGISTRY_ADDRESS,
           event: didAttributeChangedEvent as any,
           args: { identity: debouncedAddress },
-          fromBlock: fromBlock
+          fromBlock: 0n
         })
         
         // check if any event matches the attribute name
