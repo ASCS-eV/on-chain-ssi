@@ -10,7 +10,7 @@ interface IEthereumDIDRegistry {
 }
 
 interface IDigitalAssetMarketplaceStub {
-    function publishData(string calldata data) external;
+    function publishData(string calldata data, address assetOwner) external;
 }
 
 contract DIDMultisigController {
@@ -120,9 +120,10 @@ contract DIDMultisigController {
     */
     function publishMarketplaceData(
         address marketplace,
-        string calldata data
+        string calldata data,
+        address company
     ) external onlyOwner {
-        IDigitalAssetMarketplaceStub(marketplace).publishData(data);
+        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
     }
 
     /*//////////////////////////////////////////////////////////////
