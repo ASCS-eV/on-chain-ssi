@@ -330,4 +330,35 @@ contract DIDMultisigController {
 
         return ecrecover(ethSignedMessageHash, v, r, s);
     }
+
+    function privatelyPublishMarketplaceData(
+        address marketplace,
+        string calldata data,
+        address company,
+        address[] calldata companyAdmins
+    ) external onlyOwner {
+
+        // require at least 1 company admin
+        require(companyAdmins.length > 0, "no_company_admins");
+
+        // require all provided company admins to be valid delegates
+        for (uint i = 0; i < companyAdmins.length; i++) {
+            require(
+                registry.validDelegate(
+                    company,
+                    keccak256("CompanyAdmin"),
+                    companyAdmins[i]
+                ),
+                "invalid_list_of_company_admins"
+            );
+        }
+
+        // verify ZKP that proves that...
+        // 1. the trust anchor knows a signature over the message authorizing the publication of data
+        // 2. one of the company admins signed the message authorizing the publication of data
+        // 3. without revealing which company admin signed the message
+
+        // publish asset with company as owner
+        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
+    }
 }
