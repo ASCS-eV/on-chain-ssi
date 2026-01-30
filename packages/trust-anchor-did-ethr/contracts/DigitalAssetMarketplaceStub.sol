@@ -40,4 +40,14 @@ contract DigitalAssetMarketplaceStub  {
         owner = newOwner;
         emit NewOwner(newOwner);
     } 
+
+    // get asset by id
+    function getDataAssetById(uint256 assetId) external view returns (string memory) {
+        return digitalAssets[assetId];
+    }
+
+    // get owner of asset by id
+    function getAssetOwnerById(uint256 assetId) external view returns (address) {
+        return assetOwners[assetId];
+    }
 }

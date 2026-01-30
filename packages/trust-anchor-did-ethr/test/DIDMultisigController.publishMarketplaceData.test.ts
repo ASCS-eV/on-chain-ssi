@@ -1,87 +1,118 @@
 import assert from "node:assert/strict";
 import { describe, it, beforeEach } from "node:test";
 import { network } from "hardhat";
+import { keccak256, encodePacked, toHex, encodeFunctionData } from "viem";
 
-describe("DIDMultisigController – publishMarketplaceData", async function () {
+describe("DIDMultisigController – publishMarketplaceData (delegated)", async function () {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
 
-  const [taOwner1, taOwner2, assetOwner, randomUser] =
-    await viem.getWalletClients();
+  const [
+    taOwner,
+    company,
+    companyAdmin,
+    randomUser
+  ] = await viem.getWalletClients();
 
   let registry: any;
   let multisig: any;
   let marketplace: any;
 
-  beforeEach(async () => {
-    // Deploy mock DID registry
-    registry = await viem.deployContract("EthereumDIDRegistry");
+  const COMPANY_ADMIN_TYPE = keccak256(toHex("CompanyAdmin"));
 
-    // Deploy multisig with 2 owners, quorum 1
+  beforeEach(async () => {
+    // deploy contracts
+    registry = await viem.deployContract("EthereumDIDRegistry"); //did:ethr contract
     multisig = await viem.deployContract("DIDMultisigController", [
       registry.address,
-      [taOwner1.account.address, taOwner2.account.address],
+      [taOwner.account.address],
       1n
     ]);
-
-    // Deploy marketplace stub owned by multisig
     marketplace = await viem.deployContract(
       "DigitalAssetMarketplaceStub",
       [multisig.address]
     );
-  });
 
-  it("Trust Anchor admin can publish marketplace data and assign asset owner", async () => {
-    const testData = "QmMarketplaceData123";
-    const expectedAssetId = 0n;
-
-    await multisig.write.publishMarketplaceData(
-      [marketplace.address, testData, assetOwner.account.address],
-      { account: taOwner1.account }
+    // create company did:ethr identity and assign trust anchor multisig contract as owner
+    await registry.write.changeOwner(
+      [company.account.address, multisig.address],
+      { account: company.account }
     );
 
-    // Verify event emission
-    const events = await publicClient.getContractEvents({
-      address: marketplace.address,
-      abi: marketplace.abi,
-      eventName: "DataPublished"
+    // trust anchor adds company admin as delegate of company's did:ethr
+    const data = encodeFunctionData({
+      abi: registry.abi,
+      functionName: "addDelegate",
+      args: [company.account.address, COMPANY_ADMIN_TYPE, companyAdmin.account.address, 3600n]
+    });
+    await multisig.write.execCall([registry.address, data], { account: taOwner.account });
+
+
+    // assert that delegate was added
+    const isDelegate = await registry.read.validDelegate([
+      company.account.address,
+      COMPANY_ADMIN_TYPE,
+      companyAdmin.account.address
+    ]);
+    assert.equal(isDelegate, true);
+  });
+
+  it("Trust Anchor can publish on behalf of company with valid signature", async () => {
+    const data = "QmDelegatedAsset";
+
+    const messageHash = keccak256(
+      encodePacked(
+        ["address", "string", "address"],
+        [marketplace.address, data, company.account.address]
+      )
+    );
+
+    const signature = await companyAdmin.signMessage({
+      message: { raw: messageHash }
     });
 
-    const event = events.find((e: any) => e.args.data === testData);
-    assert.ok(event, "DataPublished event should be emitted");
-
-    // Verify asset ownership was recorded
-    const recordedOwner = await marketplace.read.assetOwners([
-      expectedAssetId
-    ]);
-    assert.equal(
-      recordedOwner.toLowerCase(),
-      assetOwner.account.address.toLowerCase()
-    );
-  });
-
-  it("Different Trust Anchor admin can also publish marketplace data", async () => {
-    const testData = "QmMarketplaceDataByOwner2";
-    const expectedAssetId = 0n;
-
     await multisig.write.publishMarketplaceData(
-      [marketplace.address, testData, assetOwner.account.address],
-      { account: taOwner2.account }
+      [marketplace.address, data, company.account.address, signature],
+      { account: taOwner.account }
     );
 
-    const recordedOwner = await marketplace.read.assetOwners([
-      expectedAssetId
-    ]);
-    assert.equal(
-      recordedOwner.toLowerCase(),
-      assetOwner.account.address.toLowerCase()
-    );
+    const owner = await marketplace.read.assetOwners([0n]);
+    assert.equal(owner.toLowerCase(), company.account.address.toLowerCase());
   });
 
-  it("Non-owner cannot publish marketplace data", async () => {
+  it("Fails if signer is not company admin", async () => {
+    const data = "InvalidSignerAsset";;
+
+    const badSig = await randomUser.signMessage({
+      message: { raw: keccak256(toHex("bad")) }
+    });
+
     await assert.rejects(
       multisig.write.publishMarketplaceData(
-        [marketplace.address, "UnauthorizedData", assetOwner.account.address],
+        [marketplace.address, data, company.account.address, badSig],
+        { account: taOwner.account }
+      ),
+      /signer_not_company_admin/
+    );
+  });
+
+  it("Non Trust Anchor cannot publish even with valid signature from valid company admin", async () => {
+    const data = "UnauthorizedTA";
+
+    const messageHash = keccak256(
+      encodePacked(
+        ["address", "string", "address"],
+        [marketplace.address, data, company.account.address]
+      )
+    );
+
+    const signature = await companyAdmin.signMessage({
+      message: { raw: messageHash }
+    });
+
+    await assert.rejects(
+      multisig.write.publishMarketplaceData(
+        [marketplace.address, data, company.account.address, signature],
         { account: randomUser.account }
       ),
       /not_owner/

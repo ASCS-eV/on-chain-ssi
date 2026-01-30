@@ -7,6 +7,7 @@ interface IEthereumDIDRegistry {
     function revokeDelegate(address identity, bytes32 delegateType, address delegate) external;
     function setAttribute(address identity, bytes32 name, bytes calldata value, uint validity) external;
     function revokeAttribute(address identity, bytes32 name, bytes calldata value) external;
+    function validDelegate(address identity, bytes32 delegateType, address delegate) external view returns (bool);
 }
 
 interface IDigitalAssetMarketplaceStub {
@@ -111,19 +112,6 @@ contract DIDMultisigController {
 
         (bool success, ) = target.call(data);
         require(success, "call_failed");
-    }
-
-    /**
-    * @notice Publish data to a DigitalAssetMarketplaceStub owned by this multisig.
-    * @dev Speed-layer function: callable by any Trust Anchor admin.
-    *      Assumes this multisig contract is the owner of the marketplace contract.
-    */
-    function publishMarketplaceData(
-        address marketplace,
-        string calldata data,
-        address company
-    ) external onlyOwner {
-        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -279,5 +267,67 @@ contract DIDMultisigController {
 
     function _addDelegate(bytes32 delegateType, address delegate, uint validity) external onlySelf {
         registry.addDelegate(address(this), delegateType, delegate, validity);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     5. COMPANY ADMIN ACTIONS VIA MULTISIG
+    //////////////////////////////////////////////////////////////*/
+
+    // verifiable delegated execution of publishing data to a marketplace (WITHOUT privacy of company admin!)
+    // company admins call this function to authorize trust anchor with a signature on a message requesting
+    // to publish data through the marketplace on behalf of their company
+    function publishMarketplaceData(
+        address marketplace,
+        string calldata data,
+        address company,
+        bytes calldata signature
+    ) external onlyOwner {
+        // recreate signed message hash
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(marketplace, data, company)
+        );
+        bytes32 ethSignedMessageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+        );
+
+        // recover signer (= company admin)
+        address signer = _recoverSigner(ethSignedMessageHash, signature);
+        require(signer != address(0), "invalid_signature");
+
+        // verify signer is authorized to request publication of data as asset through trust anchor,
+        // i.e. is signer a delegate and thus company admin of the company's did:ethr for which the data should be published
+        require(
+            registry.validDelegate(
+                company,
+                keccak256("CompanyAdmin"),
+                signer
+            ),
+            "signer_not_company_admin"
+        );
+
+        // publish asset with company as owner
+        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
+    }
+
+    function _recoverSigner(
+        bytes32 ethSignedMessageHash,
+        bytes calldata signature
+    ) internal pure returns (address) {
+        require(signature.length == 65, "bad_signature_length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+
+        if (v < 27) v += 27;
+        if (v != 27 && v != 28) return address(0);
+
+        return ecrecover(ethSignedMessageHash, v, r, s);
     }
 }
