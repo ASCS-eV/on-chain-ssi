@@ -57,13 +57,13 @@ export function CompaniesPage() {
         
         const logs = await publicClient.getLogs({
           address: REGISTRY_ADDRESS,
-          event: didAttributeChangedEvent as any,
+          event: didAttributeChangedEvent as typeof didAttributeChangedEvent,
           args: { identity: debouncedAddress },
           fromBlock: 0n
         })
         
         // check if any event matches the attribute name
-        const endpointSet = logs.some((log: any) => log.args.name === attributeName)
+        const endpointSet = logs.some((log: unknown) => (log as { args: { name: string } }).args.name === attributeName)
         setHasStaticEndpoint(endpointSet)
       } catch (error) {
         console.error('Error checking endpoint:', error)

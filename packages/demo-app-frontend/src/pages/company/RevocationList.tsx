@@ -5,6 +5,53 @@ import { Upload, Loader2, CheckCircle2, FileJson, X, History, ExternalLink } fro
 import { uploadToIPFS } from '../../lib/ipfs'
 import { toast } from 'sonner'
 
+interface StatusCardProps {
+  isReadingCID: boolean;
+  currentCID: string | undefined;
+}
+
+const StatusCard = ({ isReadingCID, currentCID }: StatusCardProps) => (
+    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
+        <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <History className="w-5 h-5 text-indigo-500" />
+            Current Version
+        </h3>
+        
+        <div className="flex-1 flex flex-col justify-center">
+            {isReadingCID ? (
+                <div className="animate-pulse space-y-3">
+                    <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                    <div className="h-12 bg-slate-100 rounded"></div>
+                </div>
+            ) : currentCID ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 break-all">
+                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Active IPFS CID</p>
+                    <p className="font-mono text-sm text-slate-800">{currentCID}</p>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-200 flex gap-3">
+                        <a 
+                          href={`https://ipfs.io/ipfs/${currentCID}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-xs flex items-center text-indigo-600 hover:text-indigo-700 font-medium"
+                        >
+                            <ExternalLink className="w-3 h-3 mr-1" /> View Raw Data
+                        </a>
+                        <span className="text-xs flex items-center text-green-600 font-medium">
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> Synced
+                        </span>
+                    </div>
+                </div>
+            ) : (
+                <div className="text-center text-slate-400 py-8">
+                    <FileJson className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">No revocation list published.</p>
+                </div>
+            )}
+        </div>
+    </div>
+)
+
 export function RevocationListPage() {
   const { address } = useAccount()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -47,7 +94,7 @@ export function RevocationListPage() {
         JSON.parse(text) // Validate JSON syntax
         setSelectedFile(file)
         setFileContent(text)
-    } catch (e) {
+    } catch {
         toast.error("Invalid JSON", { description: "File content is not valid JSON" })
     }
   }
@@ -76,55 +123,11 @@ export function RevocationListPage() {
             functionName: 'updateRevocationCID',
             args: [address, cid],
         })
-    } catch (error) {
+    } catch {
         setIsUploading(false)
         toast.error("Upload Failed", { description: "Failed to upload to IPFS" })
     }
   }
-
-  // --- UI COMPONENTS ---
-
-  const StatusCard = () => (
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
-          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <History className="w-5 h-5 text-indigo-500" />
-              Current Version
-          </h3>
-          
-          <div className="flex-1 flex flex-col justify-center">
-              {isReadingCID ? (
-                  <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-slate-100 rounded w-1/3"></div>
-                      <div className="h-12 bg-slate-100 rounded"></div>
-                  </div>
-              ) : currentCID ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 break-all">
-                      <p className="text-xs text-slate-500 uppercase font-bold mb-1">Active IPFS CID</p>
-                      <p className="font-mono text-sm text-slate-800">{currentCID}</p>
-                      
-                      <div className="mt-4 pt-4 border-t border-slate-200 flex gap-3">
-                          <a 
-                            href={`https://ipfs.io/ipfs/${currentCID}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-xs flex items-center text-indigo-600 hover:text-indigo-700 font-medium"
-                          >
-                              <ExternalLink className="w-3 h-3 mr-1" /> View Raw Data
-                          </a>
-                          <span className="text-xs flex items-center text-green-600 font-medium">
-                              <CheckCircle2 className="w-3 h-3 mr-1" /> Synced
-                          </span>
-                      </div>
-                  </div>
-              ) : (
-                  <div className="text-center text-slate-400 py-8">
-                      <FileJson className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                      <p className="text-sm">No revocation list published.</p>
-                  </div>
-              )}
-          </div>
-      </div>
-  )
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -216,7 +219,7 @@ export function RevocationListPage() {
 
           {/* RIGHT: CURRENT STATUS (1 Col) */}
           <div className="lg:col-span-1">
-              <StatusCard />
+              <StatusCard isReadingCID={isReadingCID} currentCID={currentCID} />
           </div>
       </div>
     </div>

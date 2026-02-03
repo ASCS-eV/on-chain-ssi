@@ -42,9 +42,24 @@ The `trust-anchor-did-ethr` package includes three main smart contracts:
 - **DIDMultisigController**: Multisig governance for trust anchor identities  
 - **CompanyCRSetRegistry**: Company registry with CRSet management
 
-## Quick Start
+## Prerequisites
 
-**Prerequisites:** Node.js >= 18.20.2, MetaMask browser extension
+- **Node.js 22.12.0 or later** (Hardhat 3 requires ≥22.10.0; Vite 7 supports 20.19+ or 22.12+, we use 22.12+ for consistency)
+- **npm 10.0.0 or later**
+- **MetaMask** browser extension
+
+**Check your versions:**
+```bash
+node --version  # Should be v22.12.0 or higher
+npm --version   # Should be 10.0.0 or higher
+```
+**Using nvm to manage Node.js versions:**
+```bash
+nvm install 22
+nvm use 22
+```
+
+## Quick Start
 
 Get the demo application running:
 
@@ -63,13 +78,32 @@ npx hardhat node
 **3. Deploy Contracts** (in a new terminal)
 ```bash
 cd packages/trust-anchor-did-ethr
-npx hardhat ignition deploy ignition/modules/TrustAnchor.ts --network localhost
 npx hardhat ignition deploy ignition/modules/CompanyCRSet.ts --network localhost
 ```
 
+The output will show three deployed addresses (example output):
+```
+CompanyCRSetModule#EthereumDIDRegistry - 0xabcd...1234
+CompanyCRSetModule#DIDMultisigController - 0xef01...5678  
+CompanyCRSetModule#CompanyCRSetRegistry - 0x9abc...def0
+```
+**Copy YOUR addresses** from the terminal output for the next step.
+
 **4. Configure Environment**
 
-In `packages/demo-app-frontend`, copy `.env.example` to `.env` and add the deployed contract addresses from step 3.
+In `packages/demo-app-frontend`, create a `.env` file by copying `.env.example`:
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and replace the placeholders with **your actual deployed addresses** from step 3:
+```env
+VITE_TRUST_ANCHOR_ADDRESS=<your_DIDMultisigController_address>    # ← Use DIDMultisigController address
+VITE_REGISTRY_ADDRESS=<your_EthereumDIDRegistry_address>           # ← Use EthereumDIDRegistry address  
+VITE_CRSET_REGISTRY_ADDRESS=<your_CompanyCRSetRegistry_address>   # ← Use CompanyCRSetRegistry address
+VITE_PINATA_JWT=your_pinata_jwt_token
+```
+
 
 **5. Import Hardhat Account to MetaMask**
 

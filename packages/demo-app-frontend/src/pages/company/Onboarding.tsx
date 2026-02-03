@@ -5,6 +5,82 @@ import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import { useEffect } from 'react'
 
+interface StepProps {
+  num: number;
+  title: string;
+  desc: string;
+  status: 'pending' | 'current' | 'completed';
+  isPending?: boolean;
+  isConfirming?: boolean;
+  isOwnerLoading?: boolean;
+  isAdminLoading?: boolean;
+  address?: `0x${string}`;
+  handOverControl?: () => void;
+  refetchAdmin?: () => void;
+}
+
+const Step = ({ 
+    num, 
+    title, 
+    desc, 
+    status,
+    isPending,
+    isConfirming,
+    isOwnerLoading,
+    isAdminLoading,
+    address,
+    handOverControl,
+    refetchAdmin
+}: StepProps) => (
+    <div className={`relative flex items-start pb-12 last:pb-0 ${status === 'pending' ? 'opacity-40' : 'opacity-100'}`}>
+        <div className="absolute left-4 top-10 -bottom-2 w-0.5 bg-slate-200 last:hidden"></div>
+        
+        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 mr-4 flex-shrink-0 transition-colors ${
+            status === 'completed' ? 'bg-green-100 border-green-500 text-green-600' :
+            status === 'current' ? 'bg-indigo-50 border-indigo-600 text-indigo-600' :
+            'bg-slate-50 border-slate-300 text-slate-400'
+        }`}>
+            {status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : <span>{num}</span>}
+        </div>
+        
+        <div className="pt-1 w-full">
+            <h4 className={`font-bold ${status === 'current' ? 'text-indigo-700' : 'text-slate-900'}`}>{title}</h4>
+            <p className="text-sm text-slate-500 mt-1 max-w-sm leading-relaxed">{desc}</p>
+            
+            {status === 'current' && num === 1 && (
+                <div className="mt-4">
+                    <button
+                      onClick={handOverControl}
+                      disabled={isPending || isConfirming || !address || isOwnerLoading}
+                      className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {isPending || isConfirming ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                      ) : isOwnerLoading ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading status...</>
+                      ) : (
+                          <><ShieldCheck className="w-4 h-4 mr-2" /> Delegate Identity</>
+                      )}
+                    </button>
+                </div>
+            )}
+
+            {status === 'current' && num === 2 && (
+                 <div className="mt-4 flex items-center gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-100 text-sm">
+                     <Clock className="w-4 h-4 flex-shrink-0 animate-pulse" />
+                     <div>
+                         <p className="font-semibold">Verification Pending</p>
+                         <p className="text-xs opacity-80 mt-1">Contact Trust Anchor to approve your registration.</p>
+                     </div>
+                     <button onClick={() => refetchAdmin?.()} className="ml-auto p-2 hover:bg-amber-100 rounded-full" title="Check Status">
+                         <RefreshCw className={`w-4 h-4 ${isAdminLoading ? 'animate-spin' : ''}`}/>
+                     </button>
+                 </div>
+            )}
+        </div>
+    </div>
+)
+
 export function CompanyOnboardingPage() {
   const { address } = useAccount()
   const { writeContract, data: hash, isPending } = useWriteContract({
@@ -58,66 +134,6 @@ export function CompanyOnboardingPage() {
     })
   }
 
-  const Step = ({ 
-      num, 
-      title, 
-      desc, 
-      status 
-  }: { 
-      num: number, 
-      title: string, 
-      desc: string, 
-      status: 'pending' | 'current' | 'completed' 
-  }) => (
-      <div className={`relative flex items-start pb-12 last:pb-0 ${status === 'pending' ? 'opacity-40' : 'opacity-100'}`}>
-          <div className="absolute left-4 top-10 -bottom-2 w-0.5 bg-slate-200 last:hidden"></div>
-          
-          <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border-2 mr-4 flex-shrink-0 transition-colors ${
-              status === 'completed' ? 'bg-green-100 border-green-500 text-green-600' :
-              status === 'current' ? 'bg-indigo-50 border-indigo-600 text-indigo-600' :
-              'bg-slate-50 border-slate-300 text-slate-400'
-          }`}>
-              {status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : <span>{num}</span>}
-          </div>
-          
-          <div className="pt-1 w-full">
-              <h4 className={`font-bold ${status === 'current' ? 'text-indigo-700' : 'text-slate-900'}`}>{title}</h4>
-              <p className="text-sm text-slate-500 mt-1 max-w-sm leading-relaxed">{desc}</p>
-              
-              {status === 'current' && num === 1 && (
-                  <div className="mt-4">
-                      <button
-                        onClick={handOverControl}
-                        disabled={isPending || isConfirming || !address || isOwnerLoading}
-                        className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center transition-colors shadow-sm disabled:opacity-50"
-                      >
-                        {isPending || isConfirming ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
-                        ) : isOwnerLoading ? (
-                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading status...</>
-                        ) : (
-                            <><ShieldCheck className="w-4 h-4 mr-2" /> Delegate Identity</>
-                        )}
-                      </button>
-                  </div>
-              )}
-
-              {status === 'current' && num === 2 && (
-                   <div className="mt-4 flex items-center gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-100 text-sm">
-                       <Clock className="w-4 h-4 flex-shrink-0 animate-pulse" />
-                       <div>
-                           <p className="font-semibold">Verification Pending</p>
-                           <p className="text-xs opacity-80 mt-1">Contact Trust Anchor to approve your registration.</p>
-                       </div>
-                       <button onClick={() => refetchAdmin()} className="ml-auto p-2 hover:bg-amber-100 rounded-full" title="Check Status">
-                           <RefreshCw className={`w-4 h-4 ${isAdminLoading ? 'animate-spin' : ''}`}/>
-                       </button>
-                   </div>
-              )}
-          </div>
-      </div>
-  )
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
@@ -135,12 +151,19 @@ export function CompanyOnboardingPage() {
                        title="Delegate Control" 
                        desc="Transfer ownership of your did:ethr identity to the Trust Anchor smart contract."
                        status={isManaged ? 'completed' : 'current'}
+                       isPending={isPending}
+                       isConfirming={isConfirming}
+                       address={address}
+                       isOwnerLoading={isOwnerLoading}
+                       handOverControl={handOverControl}
                    />
                    <Step 
                        num={2} 
                        title="Trust Anchor Verification" 
                        desc="The Trust Anchor admins will verify your company details and register you."
                        status={isManaged ? (isFullyOnboarded ? 'completed' : 'current') : 'pending'}
+                       isAdminLoading={isAdminLoading}
+                       refetchAdmin={refetchAdmin}
                    />
                    <Step 
                        num={3} 

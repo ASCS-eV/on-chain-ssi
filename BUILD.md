@@ -17,9 +17,21 @@ Before building and running the project, ensure you have the following installed
 
 ### Required Software
 
-- **Node.js**: >= 18.20.2 [Installation instructions](https://github.com/nvm-sh/nvm)
+- **Node.js**: ≥22.12.0 (required for Hardhat 3 and Vite 7) [Installation instructions](https://github.com/nvm-sh/nvm)
+- **npm**: ≥10.0.0 (usually comes with Node.js)
 - **Docker** (Optional): For containerized deployment. [Download](https://www.docker.com/get-started)
 - **MetaMask**: Browser extension for Ethereum wallet management. [Download](https://metamask.io/)
+
+**Verify your installation:**
+```bash
+node --version  # Should output v22.12.0 or higher
+npm --version   # Should output 10.0.0 or higher
+```
+
+**Why Node.js 22.12.0+?**
+- `trust-anchor-did-ethr` uses Hardhat 3, which requires Node.js ≥22.10.0
+- Vite 7 supports Node.js 20.19+ or 22.12+, but we standardize on 22.12+ for consistency
+- Using Node.js 20.x will cause Hardhat runtime errors like `flatMap is not a function`
 
 ## Package Versions
 
@@ -90,19 +102,39 @@ In a new terminal:
 cd packages/trust-anchor-did-ethr
 
 # Deploy using Hardhat Ignition
-npx hardhat ignition deploy ignition/modules/TrustAnchor.ts --network localhost
 npx hardhat ignition deploy ignition/modules/CompanyCRSet.ts --network localhost
 ```
-**Copy these addresses** for the next step.
+
+You'll see output like this (addresses will vary):
+```
+[ CompanyCRSetModule ] successfully deployed 🚀
+
+Deployed Addresses
+
+CompanyCRSetModule#EthereumDIDRegistry - 0xabcd...1234
+CompanyCRSetModule#DIDMultisigController - 0xef01...5678
+CompanyCRSetModule#CompanyCRSetRegistry - 0x9abc...def0
+```
+
+**Copy YOUR three addresses** from the terminal - you'll need them in the next step.
+
+> **Important**: Addresses are network-specific. Localhost addresses will differ from Sepolia/mainnet deployments.
 
 ### Step 3: Configure Frontend Environment
 
-In `packages/demo-app-frontend`, create a `.env` file from `.env.example` and edit it to add your deployed contract addresses:
+In `packages/demo-app-frontend`, **first create** a `.env` file by copying from `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Then **edit the `.env` file** and replace the placeholders with **your actual addresses** from the deployment output above:
 
 ```env
-VITE_TRUST_ANCHOR_ADDRESS=0x...    # DIDMultisigController address from deployment
-VITE_REGISTRY_ADDRESS=0x...        # EthereumDIDRegistry address
-VITE_CRSET_REGISTRY_ADDRESS=0x...  # CompanyCRSetRegistry address
+# Replace these with YOUR addresses from the deployment step:
+VITE_TRUST_ANCHOR_ADDRESS=<your_DIDMultisigController_address>    # ← DIDMultisigController
+VITE_REGISTRY_ADDRESS=<your_EthereumDIDRegistry_address>           # ← EthereumDIDRegistry
+VITE_CRSET_REGISTRY_ADDRESS=<your_CompanyCRSetRegistry_address>   # ← CompanyCRSetRegistry
 VITE_PINATA_JWT=your_pinata_jwt_token
 
 # Local Hardhat RPC

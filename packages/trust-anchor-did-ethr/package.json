@@ -2,6 +2,10 @@
   "name": "trust-anchor-did-ethr",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.10.0",
+    "npm": ">=10.0.0"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.6",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",
@@ -10,5 +14,16 @@
     "hardhat": "^3.1.0",
     "typescript": "~5.8.0",
     "viem": "^2.43.2"
+  },
+  "overrides": {
+    "elliptic": "^6.6.1",
+    "lodash-es": "^4.17.21",
+    "undici": "^6.23.0",
+    "@ethersproject/signing-key": {
+      "elliptic": "^6.6.1"
+    },
+    "@nomicfoundation/ignition-core": {
+      "lodash-es": "^4.17.21"
+    }
   }
 }
