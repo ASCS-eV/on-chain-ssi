@@ -17,7 +17,7 @@ export interface DecodedProposal {
   };
   description: string;
   functionName: string;
-  args: any[];
+  args: unknown[];
 }
 
 export function useTrustAnchorData() {
@@ -37,11 +37,11 @@ export function useTrustAnchorData() {
         fromBlock: 0n,
       });
 
-      const decodedProposals = proposalLogs.map((log: any) => {
-        const { id, data, requiresUnanimity } = log.args;
+      const decodedProposals = proposalLogs.map((log: unknown) => {
+        const { id, data, requiresUnanimity } = (log as { args: { id: bigint; data: `0x${string}`; requiresUnanimity: boolean } }).args;
         let description = "Unknown Action";
         let funcName = "unknown";
-        let decodedArgs: any[] = [];
+        let decodedArgs: unknown[] = [];
 
         try {
           const decoded = decodeFunctionData({
@@ -49,7 +49,7 @@ export function useTrustAnchorData() {
             data: data,
           });
           funcName = decoded.functionName;
-          decodedArgs = decoded.args as unknown as any[];
+          decodedArgs = decoded.args as unknown as unknown[];
 
           // Human readable description builder
           switch (funcName) {
@@ -57,19 +57,19 @@ export function useTrustAnchorData() {
               description = `Update Quorum to ${decodedArgs[0]}`;
               break;
             case "_addOwner":
-              description = `Add Admin: ${decodedArgs[0].slice(
+              description = `Add Admin: ${(decodedArgs[0] as string).slice(
                 0,
                 6
-              )}...${decodedArgs[0].slice(-4)}`;
+              )}...${(decodedArgs[0] as string).slice(-4)}`;
               break;
             case "_removeOwner":
-              description = `Remove Admin: ${decodedArgs[0].slice(
+              description = `Remove Admin: ${(decodedArgs[0] as string).slice(
                 0,
                 6
-              )}...${decodedArgs[0].slice(-4)}`;
+              )}...${(decodedArgs[0] as string).slice(-4)}`;
               break;
             case "_executeChangeOwner":
-              description = `Register Company: ${decodedArgs[0].slice(
+              description = `Register Company: ${(decodedArgs[0] as string).slice(
                 0,
                 6
               )}...`;
@@ -82,7 +82,7 @@ export function useTrustAnchorData() {
         }
 
         return {
-          id,
+          id: id.toString(),
           rawInfo: { data, requiresUnanimity },
           description,
           functionName: funcName,
@@ -101,9 +101,8 @@ export function useTrustAnchorData() {
       });
 
       const newApprovals: Record<string, string[]> = {};
-      approvalLogs.forEach((log: any) => {
-        const pid = log.args.id;
-        const owner = log.args.owner;
+      approvalLogs.forEach((log: unknown) => {
+        const { id: pid, owner } = (log as { args: { id: string; owner: string } }).args;
         if (!newApprovals[pid]) newApprovals[pid] = [];
         if (!newApprovals[pid].includes(owner)) newApprovals[pid].push(owner);
       });
@@ -118,12 +117,11 @@ export function useTrustAnchorData() {
     address: TRUST_ANCHOR_ADDRESS,
     abi: TRUST_ANCHOR_ABI,
     eventName: "Approved",
-    onLogs(logs: any[]) {
+    onLogs(logs: unknown[]) {
       setApprovals((prev) => {
         const updated = { ...prev };
-        logs.forEach((log: any) => {
-          const pid = log.args.id;
-          const owner = log.args.owner;
+        logs.forEach((log: unknown) => {
+          const { id: pid, owner } = (log as { args: { id: string; owner: string } }).args;
           if (!updated[pid]) updated[pid] = [];
           if (!updated[pid].includes(owner)) updated[pid].push(owner);
         });

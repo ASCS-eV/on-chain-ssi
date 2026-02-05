@@ -8,8 +8,8 @@ export const config = createConfig({
     injected(),
   ],
   transports: {
-    [hardhat.id]: http(),
-    [sepolia.id]: http(),
-    [mainnet.id]: http(),
+    [hardhat.id]: http(import.meta.env.VITE_HARDHAT_RPC_URL || 'http://127.0.0.1:8545'),
+    [sepolia.id]: http(import.meta.env.VITE_SEPOLIA_RPC_URL), // Uses public RPC if not set
+    [mainnet.id]: http(import.meta.env.VITE_MAINNET_RPC_URL),
   },
 })

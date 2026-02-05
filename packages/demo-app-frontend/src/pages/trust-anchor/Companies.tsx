@@ -1,10 +1,10 @@
-import { Loader2, CheckCircle2, AlertTriangle, Search, Building2, UserPlus, UserMinus, RefreshCw, Clock } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertTriangle, Search, Building2, UserPlus, UserMinus, Link, Clock, Info } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useReadContract } from 'wagmi'
+import { useReadContract, usePublicClient } from 'wagmi'
 import { useCRSetManagement } from '../../hooks/useCRSetManagement'
 import { useDIDSync, useReadCID } from '../../hooks/useDIDSync'
 import { REGISTRY_ADDRESS, REGISTRY_ABI, TRUST_ANCHOR_ADDRESS, CRSET_REGISTRY_ADDRESS, CRSET_REGISTRY_ABI } from '../../lib/contracts'
-import { isAddress } from 'viem'
+import { isAddress, keccak256, toBytes } from 'viem'
 import { toast } from 'sonner'
 
 export function CompaniesPage() {
@@ -13,8 +13,11 @@ export function CompaniesPage() {
   
   // State for Admin Tools
   const [adminAddress, setAdminAddress] = useState('')
+  const [hasStaticEndpoint, setHasStaticEndpoint] = useState(false)
+  const [isCheckingEndpoint, setIsCheckingEndpoint] = useState(false)
 
   // Hooks
+  const publicClient = usePublicClient()
   const { addCompanyAdmin, removeCompanyAdmin, isPending: isAdminPending, isSuccess: isAdminSuccess } = useCRSetManagement()
   const { syncCIDToDID, isPending: isSyncPending, isSuccess: isSyncSuccess } = useDIDSync()
   const { cid: companyCID, isLoading: isCIDLoading } = useReadCID(debouncedAddress)
@@ -31,10 +34,55 @@ export function CompaniesPage() {
     return () => clearTimeout(timer)
   }, [inputAddress])
 
+  // Check if static endpoint is already set
+  useEffect(() => {
+    async function checkEndpoint() {
+      if (!debouncedAddress || !publicClient) return
+      
+      setIsCheckingEndpoint(true)
+      try {
+        const attributeName = keccak256(toBytes('did/svc/CredentialRevocationList'))
+        
+        // Use proper ABI from contracts.ts
+        const didAttributeChangedEvent = REGISTRY_ABI.find(
+          (item) => item.type === 'event' && item.name === 'DIDAttributeChanged'
+        )
+        
+        if (!didAttributeChangedEvent) {
+          console.error('DIDAttributeChanged event not found in ABI')
+          setHasStaticEndpoint(false)
+          setIsCheckingEndpoint(false)
+          return
+        }
+        
+        const logs = await publicClient.getLogs({
+          address: REGISTRY_ADDRESS,
+          event: didAttributeChangedEvent as typeof didAttributeChangedEvent,
+          args: { identity: debouncedAddress },
+          fromBlock: 0n
+        })
+        
+        // check if any event matches the attribute name
+        const endpointSet = logs.some((log: unknown) => (log as { args: { name: string } }).args.name === attributeName)
+        setHasStaticEndpoint(endpointSet)
+      } catch (error) {
+        console.error('Error checking endpoint:', error)
+        setHasStaticEndpoint(false)
+      } finally {
+        setIsCheckingEndpoint(false)
+      }
+    }
+    
+    checkEndpoint()
+  }, [debouncedAddress, publicClient])
+
   // Notifications
   useEffect(() => {
       if (isAdminSuccess) toast.success("Admin Updated Successfully")
-      if (isSyncSuccess) toast.success("DID Document Synced Successfully")
+      if (isSyncSuccess) {
+        toast.success("Static Endpoint Initialized")
+        setHasStaticEndpoint(true)
+      }
   }, [isAdminSuccess, isSyncSuccess])
 
   // 1. READ: Identity Owner
@@ -79,8 +127,8 @@ export function CompaniesPage() {
   }
 
   const handleSync = () => {
-      if (!debouncedAddress || !companyCID) return
-      syncCIDToDID(debouncedAddress, companyCID)
+      if (!debouncedAddress) return
+      syncCIDToDID(debouncedAddress)
   }
 
   // --- UI RENDERERS ---
@@ -213,32 +261,77 @@ export function CompaniesPage() {
                   </div>
               </div>
 
-              {/* TOOL 2: DID SYNC */}
+              {/* TOOL 2: STATIC ENDPOINT SETUP */}
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                      <RefreshCw className="w-5 h-5 text-blue-600" />
-                      DID Synchronization
+                      <Link className="w-5 h-5 text-blue-600" />
+                      Static Endpoint Setup
                   </h3>
                   <div className="space-y-4">
+                      {/* Info Banner */}
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 flex items-start gap-2">
+                          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-blue-800">
+                              One-time setup that links this company's DID to their revocation list contract. After initialization, verifiers read CID updates automatically.
+                          </p>
+                      </div>
+
+                      {/* Current Status */}
                       <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                          <p className="text-xs text-slate-500 uppercase font-bold mb-1">Current Registry CID</p>
-                          {isCIDLoading ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-slate-400"/>
+                          <p className="text-xs text-slate-500 uppercase font-bold mb-2">Endpoint Status</p>
+                          {isCheckingEndpoint ? (
+                              <div className="flex items-center gap-2 text-slate-500">
+                                  <Loader2 className="w-4 h-4 animate-spin"/>
+                                  <span className="text-sm">Checking...</span>
+                              </div>
+                          ) : hasStaticEndpoint ? (
+                              <div className="flex items-center gap-2 text-green-600">
+                                  <CheckCircle2 className="w-4 h-4"/>
+                                  <span className="text-sm font-medium">Initialized</span>
+                              </div>
                           ) : (
-                              <p className="font-mono text-sm text-slate-800 break-all">{companyCID || "No CID found"}</p>
+                              <div className="flex items-center gap-2 text-amber-600">
+                                  <AlertTriangle className="w-4 h-4"/>
+                                  <span className="text-sm font-medium">Not Set</span>
+                              </div>
                           )}
                       </div>
+
+                      {/* Current CID Preview */}
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <p className="text-xs text-slate-500 uppercase font-bold mb-1">Latest Published CID</p>
+                          {isCIDLoading ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-slate-400"/>
+                          ) : companyCID ? (
+                              <div>
+                                  <p className="font-mono text-xs text-slate-800 break-all mb-2">{companyCID}</p>
+                                  <p className="text-xs text-slate-500 italic">Verifiers read this automatically via the static endpoint</p>
+                              </div>
+                          ) : (
+                              <p className="text-xs text-slate-400 italic">No CID published yet</p>
+                          )}
+                      </div>
+
+                      {/* Action Button */}
                       <button 
                           onClick={handleSync}
-                          disabled={isSyncPending || !companyCID}
-                          className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex justify-center items-center"
+                          disabled={isSyncPending || hasStaticEndpoint}
+                          className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
                       >
                           {isSyncPending ? (
-                              <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Syncing...</>
+                              <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Initializing...</>
+                          ) : hasStaticEndpoint ? (
+                              <><CheckCircle2 className="w-4 h-4 mr-2"/> Already Initialized</>
                           ) : (
-                              <><RefreshCw className="w-4 h-4 mr-2"/> Sync to DID Document</>
+                              <><Link className="w-4 h-4 mr-2"/> Initialize Static Endpoint</>
                           )}
                       </button>
+
+                      {hasStaticEndpoint && (
+                          <p className="text-xs text-slate-500 text-center">
+                              No further action needed. Verifiers will read CID updates automatically from the contract.
+                          </p>
+                      )}
                   </div>
               </div>
           </div>

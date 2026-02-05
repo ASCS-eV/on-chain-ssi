@@ -163,6 +163,20 @@ export const TRUST_ANCHOR_ABI = [
 ] as const;
 
 export const REGISTRY_ABI = [
+  // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: "address", name: "identity", type: "address" },
+      { indexed: false, internalType: "bytes32", name: "name", type: "bytes32" },
+      { indexed: false, internalType: "bytes", name: "value", type: "bytes" },
+      { indexed: false, internalType: "uint256", name: "validTo", type: "uint256" },
+      { indexed: false, internalType: "uint256", name: "previousChange", type: "uint256" }
+    ],
+    name: "DIDAttributeChanged",
+    type: "event",
+  },
+  // Functions
   {
     inputs: [
       { internalType: "address", name: "identity", type: "address" },

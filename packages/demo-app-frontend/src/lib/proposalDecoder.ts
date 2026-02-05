@@ -24,20 +24,20 @@ export function decodeProposalData(data: Hex): DecodedAction {
 
     if (taDecoded) {
       // Cast to unknown first to handle readonly tuples from viem
-      const args = taDecoded.args as unknown as any[];
+      const args = taDecoded.args as unknown as unknown[];
       const funcName = taDecoded.functionName as string;
 
       switch (funcName) {
         case "_addOwner":
           return {
             title: "Add Admin",
-            details: formatAddress(args[0]),
+            details: formatAddress(args[0] as string),
             type: "governance",
           };
         case "_removeOwner":
           return {
             title: "Remove Admin",
-            details: formatAddress(args[0]),
+            details: formatAddress(args[0] as string),
             type: "governance",
           };
         case "_setQuorum":
@@ -50,25 +50,25 @@ export function decodeProposalData(data: Hex): DecodedAction {
           return {
             title: "Register Company",
             details: `Identity: ${formatAddress(
-              args[0]
-            )} → New Owner: ${formatAddress(args[1])}`,
+              args[0] as string
+            )} → New Owner: ${formatAddress(args[1] as string)}`,
             type: "identity",
           };
         case "_setAttribute":
           return {
             title: "Set Attribute",
-            details: `Name: ${truncate(args[0])}`,
+            details: `Name: ${truncate(args[0] as string)}`,
             type: "identity",
           };
         case "_addDelegate":
           return {
             title: "Add Delegate",
-            details: `Delegate: ${formatAddress(args[1])}`,
+            details: `Delegate: ${formatAddress(args[1] as string)}`,
             type: "identity",
           };
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore decoding errors
   }
 
