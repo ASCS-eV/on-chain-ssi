@@ -26,5 +26,8 @@
     "@nomicfoundation/ignition-core": {
       "lodash-es": "^4.17.21"
     }
+  },
+  "scripts": {
+    "lint": "solhint 'contracts/**/*.sol'"    
   }
 }
