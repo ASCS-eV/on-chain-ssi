@@ -7,6 +7,7 @@
 - [Installation](#installation)
 - [Running the Project](#running-the-project)
 - [Testing](#testing)
+- [Development Workflow](#development-workflow)
 - [TypeScript Configuration](#typescript-configuration)
 - [Platform-Specific Notes](#platform-specific-notes)
 - [Deployment](#deployment)
@@ -65,6 +66,14 @@ This project uses the following key dependencies:
 **Note**: The project uses TypeScript 5.8.x for smart contracts and 5.9.x for frontend. This is intentional and should not cause conflicts as packages are isolated.
 
 ## Installation
+
+### Install Root Dependencies
+
+First, install root dependencies (required for Husky pre-commit hooks):
+
+```bash
+npm install
+```
 
 ### Install Dependencies for Each Package
 
@@ -186,6 +195,45 @@ npx hardhat test
 cd packages/demo-app-frontend
 npm run lint
 ```
+
+## Development Workflow
+
+### Pre-commit Hooks
+
+This project uses [Husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/okonet/lint-staged) to automatically lint your code before commits:
+
+**What happens when you commit:**
+1. You stage files: `git add src/components/MyComponent.tsx`
+2. You commit: `git commit -m "fix: update component"`
+3. Pre-commit hook runs automatically:
+   - ESLint checks code quality and fixes issues
+   - Prettier formats code (indentation, spacing, etc.)
+   - Both tools auto-fix and re-stage files
+   - Unfixable errors block the commit
+4. If successful, commit proceeds with clean, formatted code
+
+**Manual formatting:**
+```bash
+npm run format  # Format all files with Prettier
+npm run lint    # Check code quality with ESLint
+```
+
+**Configuration:**
+- Hook script: `.husky/pre-commit`
+- Prettier rules: `packages/demo-app-frontend/.prettierrc`
+- ESLint rules: `packages/demo-app-frontend/eslint.config.js`
+- Staged file rules: `packages/demo-app-frontend/package.json` → `lint-staged` section
+
+### Continuous Integration (GitHub Actions)
+
+Pull requests and pushes to `main` trigger automated checks (`.github/workflows/ci.yml`):
+
+**CI Jobs:**
+1. **Frontend Linting**: Runs ESLint on entire frontend codebase
+2. **Frontend Formatting**: Checks Prettier formatting compliance
+3. **Contract Validation**: Compiles smart contracts and runs full test suite
+
+**All checks must pass before merging.** The CI uses Node.js 22.12.0 to match local development.
 
 ## TypeScript Configuration
 

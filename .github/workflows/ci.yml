@@ -1,0 +1,99 @@
+name: Test and Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+      
+      # Frontend Linting
+      - name: Install frontend dependencies
+        working-directory: packages/demo-app-frontend
+        run: npm ci
+      
+      - name: Run ESLint (Frontend)
+        working-directory: packages/demo-app-frontend
+        run: npm run lint
+      
+      - name: Check Prettier formatting (Frontend)
+        working-directory: packages/demo-app-frontend
+        run: npx prettier --check .
+      
+      # Solidity Linting
+      - name: Install contract dependencies
+        working-directory: packages/trust-anchor-did-ethr
+        run: npm ci
+      
+      - name: Run Solhint (Contracts)
+        working-directory: packages/trust-anchor-did-ethr
+        run: npx solhint 'contracts/**/*.sol'
+
+  test:
+    name: Test
+    needs: lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: 'npm'
+          cache-dependency-path: packages/trust-anchor-did-ethr/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: packages/trust-anchor-did-ethr
+        run: npm ci
+      
+      - name: Run Hardhat tests
+        working-directory: packages/trust-anchor-did-ethr
+        run: npx hardhat test
+
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+      
+      # Compile Contracts
+      - name: Install contract dependencies
+        working-directory: packages/trust-anchor-did-ethr
+        run: npm ci
+      
+      - name: Compile smart contracts
+        working-directory: packages/trust-anchor-did-ethr
+        run: npx hardhat compile
+      
+      # Build Frontend
+      - name: Install frontend dependencies
+        working-directory: packages/demo-app-frontend
+        run: npm ci
+      
+      - name: Build frontend
+        working-directory: packages/demo-app-frontend
+        run: npm run build

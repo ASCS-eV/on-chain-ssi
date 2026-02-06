@@ -1,270 +1,263 @@
-import { type Address } from "viem";
+import { type Address } from 'viem'
 
-const ENV_TRUST_ANCHOR_ADDRESS = import.meta.env.VITE_TRUST_ANCHOR_ADDRESS;
-const ENV_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS;
-const ENV_CRSET_REGISTRY_ADDRESS = import.meta.env.VITE_CRSET_REGISTRY_ADDRESS;
+const ENV_TRUST_ANCHOR_ADDRESS = import.meta.env.VITE_TRUST_ANCHOR_ADDRESS
+const ENV_REGISTRY_ADDRESS = import.meta.env.VITE_REGISTRY_ADDRESS
+const ENV_CRSET_REGISTRY_ADDRESS = import.meta.env.VITE_CRSET_REGISTRY_ADDRESS
 
-if (!ENV_TRUST_ANCHOR_ADDRESS || !ENV_TRUST_ANCHOR_ADDRESS.startsWith("0x")) {
-  console.error("CRITICAL: Trust Anchor Address not set in .env");
+if (!ENV_TRUST_ANCHOR_ADDRESS || !ENV_TRUST_ANCHOR_ADDRESS.startsWith('0x')) {
+  console.error('CRITICAL: Trust Anchor Address not set in .env')
 }
-if (!ENV_REGISTRY_ADDRESS || !ENV_REGISTRY_ADDRESS.startsWith("0x")) {
-  console.error("CRITICAL: Registry Address not set in .env");
+if (!ENV_REGISTRY_ADDRESS || !ENV_REGISTRY_ADDRESS.startsWith('0x')) {
+  console.error('CRITICAL: Registry Address not set in .env')
 }
-if (!ENV_CRSET_REGISTRY_ADDRESS || !ENV_CRSET_REGISTRY_ADDRESS.startsWith("0x")) {
-  console.error("CRITICAL: CRSet Registry Address not set in .env");
+if (!ENV_CRSET_REGISTRY_ADDRESS || !ENV_CRSET_REGISTRY_ADDRESS.startsWith('0x')) {
+  console.error('CRITICAL: CRSet Registry Address not set in .env')
 }
 
 export const TRUST_ANCHOR_ADDRESS: Address =
-  (ENV_TRUST_ANCHOR_ADDRESS as Address) ||
-  "0x0000000000000000000000000000000000000000";
+  (ENV_TRUST_ANCHOR_ADDRESS as Address) || '0x0000000000000000000000000000000000000000'
 export const REGISTRY_ADDRESS: Address =
-  (ENV_REGISTRY_ADDRESS as Address) ||
-  "0x0000000000000000000000000000000000000000";
+  (ENV_REGISTRY_ADDRESS as Address) || '0x0000000000000000000000000000000000000000'
 export const CRSET_REGISTRY_ADDRESS: Address =
-  (ENV_CRSET_REGISTRY_ADDRESS as Address) ||
-  "0x0000000000000000000000000000000000000000";
+  (ENV_CRSET_REGISTRY_ADDRESS as Address) || '0x0000000000000000000000000000000000000000'
 
 export const TRUST_ANCHOR_ABI = [
   // --- EVENTS ---
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: "bytes32", name: "id", type: "bytes32" },
-      { indexed: false, internalType: "bytes", name: "data", type: "bytes" },
+      { indexed: true, internalType: 'bytes32', name: 'id', type: 'bytes32' },
+      { indexed: false, internalType: 'bytes', name: 'data', type: 'bytes' },
       {
         indexed: false,
-        internalType: "bool",
-        name: "requiresUnanimity",
-        type: "bool",
+        internalType: 'bool',
+        name: 'requiresUnanimity',
+        type: 'bool',
       },
     ],
-    name: "ProposalCreated",
-    type: "event",
+    name: 'ProposalCreated',
+    type: 'event',
   },
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: "bytes32", name: "id", type: "bytes32" },
+      { indexed: true, internalType: 'bytes32', name: 'id', type: 'bytes32' },
       {
         indexed: true,
-        internalType: "address",
-        name: "owner",
-        type: "address",
+        internalType: 'address',
+        name: 'owner',
+        type: 'address',
       },
     ],
-    name: "Approved",
-    type: "event",
+    name: 'Approved',
+    type: 'event',
   },
   {
     anonymous: false,
-    inputs: [
-      { indexed: true, internalType: "bytes32", name: "id", type: "bytes32" },
-    ],
-    name: "Executed",
-    type: "event",
+    inputs: [{ indexed: true, internalType: 'bytes32', name: 'id', type: 'bytes32' }],
+    name: 'Executed',
+    type: 'event',
   },
 
   // --- FUNCTIONS ---
   {
     inputs: [],
-    name: "quorum",
-    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
+    name: 'quorum',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-    name: "owners",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
+    inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    name: 'owners',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "bytes32", name: "id", type: "bytes32" }],
-    name: "approve",
+    inputs: [{ internalType: 'bytes32', name: 'id', type: 'bytes32' }],
+    name: 'approve',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   // Governance Proposals
   {
     inputs: [
-      { internalType: "address", name: "identity", type: "address" },
-      { internalType: "address", name: "newOwner", type: "address" },
+      { internalType: 'address', name: 'identity', type: 'address' },
+      { internalType: 'address', name: 'newOwner', type: 'address' },
     ],
-    name: "proposeChangeOwner",
-    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
-    stateMutability: "nonpayable",
-    type: "function",
+    name: 'proposeChangeOwner',
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "address", name: "newOwner", type: "address" }],
-    name: "proposeAddOwner",
-    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
-    stateMutability: "nonpayable",
-    type: "function",
+    inputs: [{ internalType: 'address', name: 'newOwner', type: 'address' }],
+    name: 'proposeAddOwner',
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "address", name: "owner", type: "address" }],
-    name: "proposeRemoveOwner",
-    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
-    stateMutability: "nonpayable",
-    type: "function",
+    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    name: 'proposeRemoveOwner',
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "uint256", name: "newQuorum", type: "uint256" }],
-    name: "proposeQuorumUpdate",
-    outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
-    stateMutability: "nonpayable",
-    type: "function",
+    inputs: [{ internalType: 'uint256', name: 'newQuorum', type: 'uint256' }],
+    name: 'proposeQuorumUpdate',
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
     inputs: [
-      { internalType: "address", name: "target", type: "address" },
-      { internalType: "bytes", name: "data", type: "bytes" },
+      { internalType: 'address', name: 'target', type: 'address' },
+      { internalType: 'bytes', name: 'data', type: 'bytes' },
     ],
-    name: "execCall",
+    name: 'execCall',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   // --- INTERNAL TARGET FUNCTIONS (Needed for Decoding) ---
   {
-    inputs: [{ internalType: "uint256", name: "newQuorum", type: "uint256" }],
-    name: "_setQuorum",
+    inputs: [{ internalType: 'uint256', name: 'newQuorum', type: 'uint256' }],
+    name: '_setQuorum',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "address", name: "newOwner", type: "address" }],
-    name: "_addOwner",
+    inputs: [{ internalType: 'address', name: 'newOwner', type: 'address' }],
+    name: '_addOwner',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "address", name: "owner", type: "address" }],
-    name: "_removeOwner",
+    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    name: '_removeOwner',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
     inputs: [
-      { internalType: "address", name: "identity", type: "address" },
-      { internalType: "address", name: "newOwner", type: "address" },
+      { internalType: 'address', name: 'identity', type: 'address' },
+      { internalType: 'address', name: 'newOwner', type: 'address' },
     ],
-    name: "_executeChangeOwner",
+    name: '_executeChangeOwner',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
-] as const;
+] as const
 
 export const REGISTRY_ABI = [
   // Events
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: "address", name: "identity", type: "address" },
-      { indexed: false, internalType: "bytes32", name: "name", type: "bytes32" },
-      { indexed: false, internalType: "bytes", name: "value", type: "bytes" },
-      { indexed: false, internalType: "uint256", name: "validTo", type: "uint256" },
-      { indexed: false, internalType: "uint256", name: "previousChange", type: "uint256" }
+      { indexed: true, internalType: 'address', name: 'identity', type: 'address' },
+      { indexed: false, internalType: 'bytes32', name: 'name', type: 'bytes32' },
+      { indexed: false, internalType: 'bytes', name: 'value', type: 'bytes' },
+      { indexed: false, internalType: 'uint256', name: 'validTo', type: 'uint256' },
+      { indexed: false, internalType: 'uint256', name: 'previousChange', type: 'uint256' },
     ],
-    name: "DIDAttributeChanged",
-    type: "event",
+    name: 'DIDAttributeChanged',
+    type: 'event',
   },
   // Functions
   {
     inputs: [
-      { internalType: "address", name: "identity", type: "address" },
-      { internalType: "address", name: "newOwner", type: "address" },
+      { internalType: 'address', name: 'identity', type: 'address' },
+      { internalType: 'address', name: 'newOwner', type: 'address' },
     ],
-    name: "changeOwner",
+    name: 'changeOwner',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
-    inputs: [{ internalType: "address", name: "identity", type: "address" }],
-    name: "identityOwner",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
+    inputs: [{ internalType: 'address', name: 'identity', type: 'address' }],
+    name: 'identityOwner',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
   },
   {
     inputs: [
-      { internalType: "address", name: "identity", type: "address" },
-      { internalType: "bytes32", name: "name", type: "bytes32" },
-      { internalType: "bytes", name: "value", type: "bytes" },
-      { internalType: "uint256", name: "validity", type: "uint256" },
+      { internalType: 'address', name: 'identity', type: 'address' },
+      { internalType: 'bytes32', name: 'name', type: 'bytes32' },
+      { internalType: 'bytes', name: 'value', type: 'bytes' },
+      { internalType: 'uint256', name: 'validity', type: 'uint256' },
     ],
-    name: "setAttribute",
+    name: 'setAttribute',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
-] as const;
+] as const
 
 export const CRSET_REGISTRY_ABI = [
   {
     inputs: [
-      { internalType: "address", name: "companyDID", type: "address" },
-      { internalType: "address", name: "admin", type: "address" },
+      { internalType: 'address', name: 'companyDID', type: 'address' },
+      { internalType: 'address', name: 'admin', type: 'address' },
     ],
-    name: "addCompanyAdmin",
+    name: 'addCompanyAdmin',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
     inputs: [
-      { internalType: "address", name: "companyDID", type: "address" },
-      { internalType: "address", name: "admin", type: "address" },
+      { internalType: 'address', name: 'companyDID', type: 'address' },
+      { internalType: 'address', name: 'admin', type: 'address' },
     ],
-    name: "removeCompanyAdmin",
+    name: 'removeCompanyAdmin',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
   },
   {
     inputs: [
-      { internalType: "address", name: "companyDID", type: "address" },
-      { internalType: "string", name: "newCID", type: "string" },
+      { internalType: 'address', name: 'companyDID', type: 'address' },
+      { internalType: 'string', name: 'newCID', type: 'string' },
     ],
-    name: "updateRevocationCID",
+    name: 'updateRevocationCID',
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'companyDID', type: 'address' }],
+    name: 'getRevocationCID',
+    outputs: [{ internalType: 'string', name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
   },
   {
     inputs: [
-      { internalType: "address", name: "companyDID", type: "address" },
+      { internalType: 'address', name: 'companyDID', type: 'address' },
+      { internalType: 'address', name: 'admin', type: 'address' },
     ],
-    name: "getRevocationCID",
-    outputs: [{ internalType: "string", name: "", type: "string" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "address", name: "companyDID", type: "address" },
-      { internalType: "address", name: "admin", type: "address" },
-    ],
-    name: "isCompanyAdmin",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "view",
-    type: "function",
+    name: 'isCompanyAdmin',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
   },
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: "address", name: "companyDID", type: "address" },
-      { indexed: false, internalType: "string", name: "newCID", type: "string" },
+      { indexed: true, internalType: 'address', name: 'companyDID', type: 'address' },
+      { indexed: false, internalType: 'string', name: 'newCID', type: 'string' },
     ],
-    name: "RevocationCIDUpdated",
-    type: "event",
+    name: 'RevocationCIDUpdated',
+    type: 'event',
   },
-] as const;
+] as const

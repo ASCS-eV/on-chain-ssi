@@ -65,6 +65,10 @@ Get the demo application running:
 
 **1. Install Dependencies**
 ```bash
+# Install root dependencies (Husky for pre-commit hooks)
+npm install
+
+# Install package dependencies
 cd packages/trust-anchor-did-ethr && npm install
 cd packages/demo-app-frontend && npm install
 ```
@@ -117,9 +121,12 @@ npm run dev
 
 Open http://localhost:5173/ in your browser.
 
+**Note**: This project uses pre-commit hooks (Husky) and CI checks. See [Development Workflow](BUILD.md#development-workflow) in BUILD.md for details.
+
 ## Documentation
 
 - **[BUILD.md](BUILD.md)** - Comprehensive build instructions, testing, troubleshooting, and deployment guides
+- **[CI_CD.md](CI_CD.md)** - CI/CD pipeline documentation with workflow details and troubleshooting
 - **[Smart Contracts](packages/trust-anchor-did-ethr/README.md)** - Detailed smart contract documentation
 - **[Demo Application](packages/demo-app-frontend/README.md)** - Frontend application guide
 
