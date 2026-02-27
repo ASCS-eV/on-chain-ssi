@@ -1,5 +1,7 @@
 # on-chain-ssi
 
+[![GitBook Documentation](https://img.shields.io/badge/GitBook-Documentation-blue?logo=gitbook)](docs/getting-started.md)
+
 ## About
 
 On-Chain Self-Sovereign Identity (SSI) architecture migrating CRSet from Ethereum Blobs to Tezos Etherlink. This project enables organizations to issue and verify decentralized digital identities anchored on blockchain, providing cryptographic proof of identity without relying on centralized authorities.
@@ -125,10 +127,15 @@ Open http://localhost:5173/ in your browser.
 
 ## Documentation
 
+The comprehensive project features and setup information are part of the GitBook documentation. You can find the source in the [`docs/`](docs/) directory.
+
+- **[📖 GitBook Documentation](docs/getting-started.md)** - Main entry point
 - **[BUILD.md](BUILD.md)** - Comprehensive build instructions, testing, troubleshooting, and deployment guides
 - **[CI_CD.md](CI_CD.md)** - CI/CD pipeline documentation with workflow details and troubleshooting
 - **[Smart Contracts](packages/trust-anchor-did-ethr/README.md)** - Detailed smart contract documentation
 - **[Demo Application](packages/demo-app-frontend/README.md)** - Frontend application guide
+
+To contribute to the documentation, simply modify the Markdown files in the `docs/` directory and create a Pull Request. GitBook will automatically synchronize the changes via its native GitHub App.
 
 ## License
 
