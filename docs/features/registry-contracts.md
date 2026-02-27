@@ -83,3 +83,8 @@ const proposalId = receipt.logs[0].args.id;
 // Other owners must approve the proposal
 const txApprove = await multisigController.connect(owner2).approve(proposalId);
 ```
+
+## Ecosystem Specifications (EVES)
+
+For the official design rationale, including our choice of `did:ethr`, the IPFS-based CRSet structure, and the gasless onboarding relay workflows, please refer to our drafted standard:
+- **[EVES-008: ENVITED-X On-Chain Identity & Revocation Management](../../submodules/EVES/EVES/EVES-008/EVES-008.md)**
