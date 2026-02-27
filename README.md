@@ -135,7 +135,7 @@ The comprehensive project features and setup information are part of the GitBook
 - **[Smart Contracts](packages/trust-anchor-did-ethr/README.md)** - Detailed smart contract documentation
 - **[Demo Application](packages/demo-app-frontend/README.md)** - Frontend application guide
 
-To contribute to the documentation, simply modify the Markdown files in the `docs/` directory and create a Pull Request. GitBook will automatically synchronize the changes via its native GitHub App.
+To contribute to the documentation or the codebase, please review our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md). For documentation specifically, simply modify the Markdown files in the `docs/` directory and create a Pull Request. GitBook will automatically synchronize the changes via its native GitHub App.
 
 ## License
 
