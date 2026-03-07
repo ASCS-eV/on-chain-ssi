@@ -14,6 +14,34 @@ interface IDigitalAssetMarketplaceStub {
     function publishData(string calldata data, address assetOwner) external;
 }
 
+// Interface for Groth16 verifier of group with size 2 to 4
+interface IVerifierM2 {
+    function verifyProof(
+        uint256[2] calldata a,
+        uint256[2][2] calldata b,
+        uint256[2] calldata c,
+        uint256[6] calldata input
+    ) external view returns (bool);
+}
+
+interface IVerifierM3 {
+    function verifyProof(
+        uint256[2] calldata a,
+        uint256[2][2] calldata b,
+        uint256[2] calldata c,
+        uint256[8] calldata input
+    ) external view returns (bool);
+}
+
+interface IVerifierM4 {
+    function verifyProof(
+        uint256[2] calldata a,
+        uint256[2][2] calldata b,
+        uint256[2] calldata c,
+        uint256[8] calldata input
+    ) external view returns (bool);
+}
+
 contract DIDMultisigController {
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
@@ -35,6 +63,8 @@ contract DIDMultisigController {
     }
 
     mapping(bytes32 => Proposal) public proposals;
+    mapping(uint256 => bool) public usedNonces; // For tracking used nonces in private publishing of digital data assets
+    mapping(uint256 => address) public verifiers; // maps group size to respectively responsible zkp verifier contract address
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -270,7 +300,8 @@ contract DIDMultisigController {
     }
 
     /*//////////////////////////////////////////////////////////////
-                     5. COMPANY ADMIN ACTIONS VIA MULTISIG
+                    5. COMPANY ADMIN ACTION: 
+                    Public Publishing of Digital Data Assets
     //////////////////////////////////////////////////////////////*/
 
     // verifiable delegated execution of publishing data to a marketplace (WITHOUT privacy of company admin!)
@@ -331,34 +362,200 @@ contract DIDMultisigController {
         return ecrecover(ethSignedMessageHash, v, r, s);
     }
 
-    function privatelyPublishMarketplaceData(
-        address marketplace,
-        string calldata data,
-        address company,
-        address[] calldata companyAdmins
-    ) external onlyOwner {
+    /*//////////////////////////////////////////////////////////////
+                    6. COMPANY ADMIN ACTION: 
+                    Privately Publishing of Digital Data Assets
+    //////////////////////////////////////////////////////////////*/
 
-        // require at least 1 company admin
-        require(companyAdmins.length > 0, "no_company_admins");
+    // Register or update verifier for a specific group size
+    function setVerifier(uint256 m, address verifier) external onlyOwner {
+        require(verifier != address(0), "invalid_verifier");
+        verifiers[m] = verifier;
+    }
 
-        // require all provided company admins to be valid delegates
-        for (uint i = 0; i < companyAdmins.length; i++) {
+    // Remove a verifier
+    function removeVerifier(uint256 m) external onlyOwner {
+        delete verifiers[m];
+    }
+
+    struct ZKProofInput {
+        address marketplace;
+        string cid;
+        address company;
+        address[] companyAdmins;
+        uint256 inputNonce;
+        uint256[2] a;
+        uint256[2][2] b;
+        uint256[2] c;
+        uint256[] input;
+    }
+
+    function privatelyPublishMarketplaceData(ZKProofInput calldata zkInput) external onlyOwner{
+        uint256 m = zkInput.companyAdmins.length;
+
+        require(m > 0, "no_admins");
+        require(!usedNonces[zkInput.inputNonce], "nonce_used"); // protect against replay attacks by ensuring nonce is unique and unused
+
+        /* ---------------------------------------------------------
+        1. Validate admins via registry
+        ----------------------------------------------------------*/
+        for (uint256 i = 0; i < m; i++) {
             require(
                 registry.validDelegate(
-                    company,
+                    zkInput.company,
                     keccak256("CompanyAdmin"),
-                    companyAdmins[i]
+                    zkInput.companyAdmins[i]
                 ),
-                "invalid_list_of_company_admins"
+                "invalid_company_admin"
             );
         }
 
-        // verify ZKP that proves that...
-        // 1. the trust anchor knows a signature over the message authorizing the publication of data
-        // 2. one of the company admins signed the message authorizing the publication of data
-        // 3. without revealing which company admin signed the message
+        /* ---------------------------------------------------------
+        2. Get ZKP verifier for group size m
+        ----------------------------------------------------------*/
+        address verifierAddr = verifiers[m];
+        require(verifierAddr != address(0), "verifier_not_set");
 
-        // publish asset with company as owner
-        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
+        /* ---------------------------------------------------------
+        3. Compute message hash (must match circuit)
+        ----------------------------------------------------------*/
+        (uint256 hi, uint256 lo) = hashPublishMessage(
+            zkInput.inputNonce,
+            zkInput.cid,
+            zkInput.company,
+            zkInput.marketplace
+        );
+
+        /* ---------------------------------------------------------
+        4. Validate public inputs
+        Circuit order:
+        [ attestation,
+            addr0..addr(m-1),
+            hi,
+            lo,
+            nonce ]
+        ----------------------------------------------------------*/
+
+        // todo in future: attestation / domain separator
+        
+        // admins
+        for (uint256 i = 0; i < m; i++) {
+            require(
+                zkInput.input[i + 1]
+                    == uint256(uint160(zkInput.companyAdmins[i])),
+                "admin_mismatch"
+            );
+        }
+
+        // hash hi / lo
+        require(
+            zkInput.input[m + 1] == hi,
+            "hash_hi_mismatch"
+        );
+
+        require(
+            zkInput.input[m + 2] == lo,
+            "hash_lo_mismatch"
+        );
+
+        // nonce
+        require(
+            zkInput.input[m + 3] == zkInput.inputNonce,
+            "nonce_mismatch"
+        );
+
+        /* ---------------------------------------------------------
+        5. Verify ZK proof
+        ----------------------------------------------------------*/
+        bool ok = _verifyProof(m, zkInput);
+        require(ok, "invalid_zk_proof");
+
+        /* ---------------------------------------------------------
+        6. Consume nonce BEFORE external call (reentrancy safety)
+        ----------------------------------------------------------*/
+        usedNonces[zkInput.inputNonce] = true;
+
+        /* ---------------------------------------------------------
+        7. Publish
+        ----------------------------------------------------------*/
+        IDigitalAssetMarketplaceStub(zkInput.marketplace)
+            .publishData(zkInput.cid, zkInput.company);
+    }
+
+    // Helper to convert dynamic input to the fixed size the Verifier interface expects
+    function _verifyProof(uint256 m, ZKProofInput calldata zkInput)
+        internal
+        view
+        returns (bool)
+    {
+        address verifier = verifiers[m];
+
+        require(verifier != address(0), "unsupported_group_size");
+
+        if (m == 2) {
+            uint256[6] memory signals;
+
+            for (uint256 i = 0; i < 6; i++) {
+                signals[i] = zkInput.input[i];
+            }
+
+            return IVerifierM2(verifier).verifyProof(
+                zkInput.a,
+                zkInput.b,
+                zkInput.c,
+                signals
+            );
+        }
+
+        if (m == 3) {
+            uint256[8] memory signals;
+
+            for (uint256 i = 0; i < 8; i++) {
+                signals[i] = zkInput.input[i];
+            }
+
+            return IVerifierM3(verifier).verifyProof(
+                zkInput.a,
+                zkInput.b,
+                zkInput.c,
+                signals
+            );
+        }
+
+        if (m == 4) {
+            uint256[8] memory signals;
+
+            for (uint256 i = 0; i < 8; i++) {
+                signals[i] = zkInput.input[i];
+            }
+
+            return IVerifierM4(verifier).verifyProof(
+                zkInput.a,
+                zkInput.b,
+                zkInput.c,
+                signals
+            );
+        }
+
+        revert("invalid_group_size");
+    }
+
+    function hashPublishMessage(
+        uint256 nonce,
+        string memory cid,
+        address company,
+        address marketplace
+    ) public pure returns (uint256 hi, uint256 lo) {
+        bytes memory data = abi.encodePacked(
+            "ZK_PUBLISH_V1",
+            nonce,
+            cid,
+            company,
+            marketplace
+        );
+        bytes32 h = keccak256(data);
+        uint256 x = uint256(h);
+        lo = x & ((1 << 128) - 1);
+        hi = x >> 128;
     }
 }

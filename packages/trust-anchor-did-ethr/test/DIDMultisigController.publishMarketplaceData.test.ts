@@ -3,7 +3,7 @@ import { describe, it, beforeEach } from "node:test";
 import { network } from "hardhat";
 import { keccak256, encodePacked, toHex, encodeFunctionData } from "viem";
 
-describe("DIDMultisigController – publishMarketplaceData (delegated)", async function () {
+describe("DIDMultisigController – public publishing on marketplace", async function () {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
 
