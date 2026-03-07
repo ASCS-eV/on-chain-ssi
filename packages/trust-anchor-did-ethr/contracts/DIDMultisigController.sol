@@ -7,6 +7,11 @@ interface IEthereumDIDRegistry {
     function revokeDelegate(address identity, bytes32 delegateType, address delegate) external;
     function setAttribute(address identity, bytes32 name, bytes calldata value, uint validity) external;
     function revokeAttribute(address identity, bytes32 name, bytes calldata value) external;
+    function validDelegate(address identity, bytes32 delegateType, address delegate) external view returns (bool);
+}
+
+interface IDigitalAssetMarketplaceStub {
+    function publishData(string calldata data, address assetOwner) external;
 }
 
 contract DIDMultisigController {
@@ -262,5 +267,98 @@ contract DIDMultisigController {
 
     function _addDelegate(bytes32 delegateType, address delegate, uint validity) external onlySelf {
         registry.addDelegate(address(this), delegateType, delegate, validity);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     5. COMPANY ADMIN ACTIONS VIA MULTISIG
+    //////////////////////////////////////////////////////////////*/
+
+    // verifiable delegated execution of publishing data to a marketplace (WITHOUT privacy of company admin!)
+    // company admins call this function to authorize trust anchor with a signature on a message requesting
+    // to publish data through the marketplace on behalf of their company
+    function publishMarketplaceData(
+        address marketplace,
+        string calldata data,
+        address company,
+        bytes calldata signature
+    ) external onlyOwner {
+        // recreate signed message hash
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(marketplace, data, company)
+        );
+        bytes32 ethSignedMessageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+        );
+
+        // recover signer (= company admin)
+        address signer = _recoverSigner(ethSignedMessageHash, signature);
+        require(signer != address(0), "invalid_signature");
+
+        // verify signer is authorized to request publication of data as asset through trust anchor,
+        // i.e. is signer a delegate and thus company admin of the company's did:ethr for which the data should be published
+        require(
+            registry.validDelegate(
+                company,
+                keccak256("CompanyAdmin"),
+                signer
+            ),
+            "signer_not_company_admin"
+        );
+
+        // publish asset with company as owner
+        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
+    }
+
+    function _recoverSigner(
+        bytes32 ethSignedMessageHash,
+        bytes calldata signature
+    ) internal pure returns (address) {
+        require(signature.length == 65, "bad_signature_length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+
+        if (v < 27) v += 27;
+        if (v != 27 && v != 28) return address(0);
+
+        return ecrecover(ethSignedMessageHash, v, r, s);
+    }
+
+    function privatelyPublishMarketplaceData(
+        address marketplace,
+        string calldata data,
+        address company,
+        address[] calldata companyAdmins
+    ) external onlyOwner {
+
+        // require at least 1 company admin
+        require(companyAdmins.length > 0, "no_company_admins");
+
+        // require all provided company admins to be valid delegates
+        for (uint i = 0; i < companyAdmins.length; i++) {
+            require(
+                registry.validDelegate(
+                    company,
+                    keccak256("CompanyAdmin"),
+                    companyAdmins[i]
+                ),
+                "invalid_list_of_company_admins"
+            );
+        }
+
+        // verify ZKP that proves that...
+        // 1. the trust anchor knows a signature over the message authorizing the publication of data
+        // 2. one of the company admins signed the message authorizing the publication of data
+        // 3. without revealing which company admin signed the message
+
+        // publish asset with company as owner
+        IDigitalAssetMarketplaceStub(marketplace).publishData(data, company);
     }
 }
