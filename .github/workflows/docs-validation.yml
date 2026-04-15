@@ -1,0 +1,24 @@
+name: Docs Validation
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'docs/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'docs/**'
+
+jobs:
+  lint-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Lint markdown files
+        uses: davidanson/markdownlint-cli2-action@v15
+        with:
+          globs: |
+            docs/**/*.md

@@ -34,7 +34,7 @@ You can containerize this application using the included Dockerfile (Nginx + Alp
 
 ### 1. Build the Image
 
-*Note: The build process bakes the `.env` variables into the static files. Ensure your `.env` file is correct before building.*
+_Note: The build process bakes the `.env` variables into the static files. Ensure your `.env` file is correct before building._
 
 ```bash
 docker build -t ssi-frontend .
@@ -75,51 +75,49 @@ The application supports two distinct user roles. Use MetaMask to switch between
 
 ### 🏛️ Role 1: Trust Anchor (Administrator)
 
-*Use the wallet address that deployed the contracts (Account #0).*
+_Use the wallet address that deployed the contracts (Account #0)._
 
 1. **Dashboard Overview:**
-* Navigate to `/trust-anchor`.
-* View real-time governance stats, quorum thresholds, and active proposals.
 
+- Navigate to `/trust-anchor`.
+- View real-time governance stats, quorum thresholds, and active proposals.
 
 2. **Registering Companies:**
-* Go to **Companies**.
-* Search for a company's DID address (Wallet Address).
-* If the company is "Not Managed", wait for them to delegate control.
-* If they have delegated (Yellow status), scroll down to **"CRSet Admins"**.
-* Paste the company's address and click **Add**. This completes the registration immediately (no proposal required).
 
+- Go to **Companies**.
+- Search for a company's DID address (Wallet Address).
+- If the company is "Not Managed", wait for them to delegate control.
+- If they have delegated (Yellow status), scroll down to **"CRSet Admins"**.
+- Paste the company's address and click **Add**. This completes the registration immediately (no proposal required).
 
 3. **Governance:**
-* Go to **Governance**.
-* Propose adding/removing admins or updating the multi-sig quorum threshold.
 
-
+- Go to **Governance**.
+- Propose adding/removing admins or updating the multi-sig quorum threshold.
 
 ### 🏢 Role 2: Company (User)
 
-*Use any other wallet address (Account #1, #2, etc.).*
+_Use any other wallet address (Account #1, #2, etc.)._
 
 1. **Onboarding:**
-* Navigate to `/company/onboarding`.
-* **Step 1 (Delegate):** Sign the transaction to transfer identity ownership to the Trust Anchor.
-* **Step 2 (Verification):** Wait for the Trust Anchor to approve your registration and add you as a CRSet Admin.
-* **Step 3 (Complete):** Once verified, the dashboard will unlock.
 
+- Navigate to `/company/onboarding`.
+- **Step 1 (Delegate):** Sign the transaction to transfer identity ownership to the Trust Anchor.
+- **Step 2 (Verification):** Wait for the Trust Anchor to approve your registration and add you as a CRSet Admin.
+- **Step 3 (Complete):** Once verified, the dashboard will unlock.
 
 2. **Revocation Management:**
-* Navigate to `/company/revocations`.
-* **Upload:** Drag & Drop a W3C-compliant JSON revocation list.
-* **Publish:** The app uploads the file to IPFS (via Pinata) and updates the smart contract with the new CID.
 
-
+- Navigate to `/company/revocations`.
+- **Upload:** Drag & Drop a W3C-compliant JSON revocation list.
+- **Publish:** The app uploads the file to IPFS (via Pinata) and updates the smart contract with the new CID.
 
 ---
 
 ## 🛠 Tech Stack
 
-* **Framework:** React + Vite
-* **Language:** TypeScript
-* **Web3 Integration:** Wagmi v2, Viem, TanStack Query
-* **Styling:** Tailwind CSS, Lucide Icons
-* **Deployment:** Docker, Nginx
+- **Framework:** React + Vite
+- **Language:** TypeScript
+- **Web3 Integration:** Wagmi v2, Viem, TanStack Query
+- **Styling:** Tailwind CSS, Lucide Icons
+- **Deployment:** Docker, Nginx
