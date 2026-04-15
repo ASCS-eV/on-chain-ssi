@@ -7,13 +7,15 @@
     "npm": ">=10.0.0"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-ignition": "^3.0.6",
+    "@nomicfoundation/hardhat-ignition-viem": "^3.0.7",
+    "@nomicfoundation/hardhat-keystore": "^3.0.4",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",
-    "@types/node": "^22.19.3",
-    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
-    "hardhat": "^3.1.0",
-    "solhint": "^6.0.3",
-    "typescript": "~5.8.0",
+    "@types/node": "^22.0.0",
+    "chai": "^4.3.10",
+    "ethers": "^6.16.0",
+    "hardhat": "^3.1.8",
+    "snarkjs": "^0.7.5",
+    "typescript": "^5.8.0",
     "viem": "^2.43.2"
   },
   "overrides": {
